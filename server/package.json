@@ -1,0 +1,16 @@
+{
+  "name": "@aquaveda/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AquaVeda v2 — Express API service",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "seed:users": "node src/seed/seedUsers.js"
+  },
+  "dependencies": {}
+}

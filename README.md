@@ -1,68 +1,92 @@
 # AquaVeda v2
 
-A civic intelligence platform: communities, experts, and organizations collaboratively identify, understand, prioritize, and resolve environmental challenges through geospatial reporting, verified knowledge, AI-assisted guidance, and coordinated action.
+A civic intelligence platform: communities, experts, and organizations
+collaboratively identify, understand, prioritize, and resolve environmental
+challenges through geospatial reporting, verified knowledge, AI-assisted
+guidance, and coordinated action.
 
-Water is the flagship domain, not the ceiling.
+**Water is the flagship domain, not the ceiling.**
 
-This is a reconstruction, not a migration, of the original AquaVeda (React + Vite + Express, SIH 2024).
+This is a reconstruction — not a migration — of the original AquaVeda
+(React + Vite + Express, SIH 2024). See `docs/adr/ADR-0001-new-repository.md`.
 
 ---
 
 ## Current milestone
 
-Design System + Application Foundation is complete.
+**Design System + Application Foundation — complete.**
 
-The app shell, design tokens, UI primitive library, mobile navigation, and one validated Server → Client data loop are in place. No business logic has been added yet. See `CLAUDE.md` for the completed checklist.
+App shell, design tokens, full UI primitive library, mobile navigation,
+hydration-safe theme toggle, and one validated Server → Client data loop.
+No business logic yet. Full checklist in `CLAUDE.md`.
+
+## Next milestone
+
+**Domain Model** — Mongoose schemas, Express bootstrap, Zod validation.
+
+---
+
+## Repository layout
+
+```
+aquaveda-v2/
+  src/          Next.js web application (App Router)
+  server/       Express API service
+  docs/         Architecture, ADRs, engineering standards, vision
+```
+
+Frontend and backend share one repository — one roadmap, one documentation
+set, one release cadence. Future evolution path: `apps/web` + `apps/server`
+workspace layout if a third surface (mobile, etc.) ever justifies it.
+
+---
 
 ## Getting started
 
 ```bash
+# Web app
 npm install
 npm run dev        # http://localhost:3000
-npm run typecheck  # tsc --noEmit
-npm run lint       # ESLint
+npm run typecheck
+npm run lint
+
+# Server (nothing to run yet — Domain Model milestone brings first code)
+cd server
+npm install
 ```
 
-Feature-specific libraries are added at the milestone that needs them. `package.json` reflects what is actually built today.
+---
 
 ## Tech stack (installed today)
 
-- Next.js 16 (App Router)
-- React 19
-- TypeScript
-- Tailwind CSS v4
-- `next-themes`
-- `clsx`, `tailwind-merge`, `class-variance-authority`
-- `lucide-react`
+**Web (`src/`):**
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 ·
+Radix UI (`react-slot`, `react-avatar`, `react-dialog`) ·
+`class-variance-authority` · `clsx` · `tailwind-merge` ·
+`lucide-react` · `next-themes`
 
-Planned libraries such as `zod`, React Hook Form, TanStack Query, Leaflet, Framer Motion, `jose`, and `bcryptjs` are intentionally deferred until their milestone starts.
+**Server (`server/`):**
+Nothing installed yet — Express, Mongoose, Zod, and `jsonwebtoken`
+arrive at the Domain Model and Authentication milestones.
+
+Feature-specific libraries are added at the milestone that first imports
+them. `package.json` reflects what is actually built today.
+
+---
 
 ## Documentation
 
 ```
 docs/
-	vision/        vision.md, principles.md
-	engineering/   standards.md, testing.md
-	adr/           ADR-0001 (new repo), ADR-0002 (keep Express)
-	domain/        domain-model.md
-	architecture/  nextjs-patterns.md
-	future/        parking-lot.md
+  vision/        vision.md, principles.md, product-invariants.md
+  engineering/   standards.md (coding rules, dependency policy, DoD)
+                 testing.md
+  adr/           ADR-0001 (new repo), ADR-0002 (keep Express)
+  domain/        domain-model.md (primitives and their milestones)
+  architecture/  nextjs-patterns.md
+  future/        parking-lot.md
 ```
 
-Start with `docs/vision/vision.md` to understand what is being built.
-
-## Project structure
-
-```
-src/
-	app/              Routes: layout, page, loading, error, not-found, api/**
-	components/
-		ui/             Button, Card, Badge, Input, Textarea, Separator,
-										Skeleton, Avatar
-		layout/         Navbar, Footer, ThemeToggle, MobileNav
-		providers/      ThemeProvider
-		foundation/     Foundation Slice status card + refresh button
-	lib/
-		utils.ts        cn() — Tailwind class merge utility
-		system.ts       getSystemSnapshot() — server-side system data
-```
+Start with `docs/vision/vision.md`.
+Read `docs/vision/product-invariants.md` to understand the non-negotiable rules.
+Read `docs/adr/` to understand why things are built the way they are.
