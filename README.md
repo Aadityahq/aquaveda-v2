@@ -1,43 +1,68 @@
 # AquaVeda v2
 
-AquaVeda v2 is a reconstruction of the platform on Next.js App Router.
-Water is the flagship domain.
+A civic intelligence platform: communities, experts, and organizations collaboratively identify, understand, prioritize, and resolve environmental challenges through geospatial reporting, verified knowledge, AI-assisted guidance, and coordinated action.
+
+Water is the flagship domain, not the ceiling.
+
+This is a reconstruction, not a migration, of the original AquaVeda (React + Vite + Express, SIH 2024).
+
+---
 
 ## Current milestone
 
-Foundation Slice:
+Design System + Application Foundation is complete.
 
-- App shell with `layout.tsx`, metadata, fonts, navbar, footer
-- Theme support with `next-themes` and a provider boundary
-- Root route states (`loading.tsx`, `error.tsx`, `not-found.tsx`)
-- Minimal design system primitives (`Button`, `Card`, `Badge`)
-- One basic System status loop (`/api/system`) for server-to-client flow validation
-
-## Tech stack (day 1)
-
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS v4
-- shadcn-style primitives dependencies
-- `clsx` + `tailwind-merge`
-- `next-themes`
-
-Feature-specific libraries are intentionally deferred until their milestone starts.
+The app shell, design tokens, UI primitive library, mobile navigation, and one validated Server → Client data loop are in place. No business logic has been added yet. See `CLAUDE.md` for the completed checklist.
 
 ## Getting started
 
 ```bash
 npm install
-npm run dev
+npm run dev        # http://localhost:3000
+npm run typecheck  # tsc --noEmit
+npm run lint       # ESLint
 ```
 
-## Planned documentation
+Feature-specific libraries are added at the milestone that needs them. `package.json` reflects what is actually built today.
 
-The following documentation sets are planned and will be added when their milestone begins:
+## Tech stack (installed today)
 
-- Architecture docs
-- ADR docs
-- Engineering standards
-- Testing strategy
-- Domain model docs
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS v4
+- `next-themes`
+- `clsx`, `tailwind-merge`, `class-variance-authority`
+- `lucide-react`
+
+Planned libraries such as `zod`, React Hook Form, TanStack Query, Leaflet, Framer Motion, `jose`, and `bcryptjs` are intentionally deferred until their milestone starts.
+
+## Documentation
+
+```
+docs/
+	vision/        vision.md, principles.md
+	engineering/   standards.md, testing.md
+	adr/           ADR-0001 (new repo), ADR-0002 (keep Express)
+	domain/        domain-model.md
+	architecture/  nextjs-patterns.md
+	future/        parking-lot.md
+```
+
+Start with `docs/vision/vision.md` to understand what is being built.
+
+## Project structure
+
+```
+src/
+	app/              Routes: layout, page, loading, error, not-found, api/**
+	components/
+		ui/             Button, Card, Badge, Input, Textarea, Separator,
+										Skeleton, Avatar
+		layout/         Navbar, Footer, ThemeToggle, MobileNav
+		providers/      ThemeProvider
+		foundation/     Foundation Slice status card + refresh button
+	lib/
+		utils.ts        cn() — Tailwind class merge utility
+		system.ts       getSystemSnapshot() — server-side system data
+```

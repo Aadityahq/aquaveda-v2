@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const NAV_ITEMS = [
@@ -37,8 +38,9 @@ export function Navbar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <ThemeToggle />
+          <MobileNav />
         </div>
       </div>
       <div className="contour-rule" aria-hidden="true" />
