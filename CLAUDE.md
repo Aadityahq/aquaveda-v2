@@ -4,9 +4,38 @@
 
 ## Current Milestone
 
-Design System + Application Foundation — **COMPLETE**
+Domain Model (decision phase) — **COMPLETE**
+
+Domain analysis, entity-by-entity review, and four decision clusters
+(Issue lifecycle, Knowledge lifecycle, Issue↔Project, Recommendation) are
+resolved and cross-checked for consistency. This covers domain decisions
+only — no Mongoose schemas, models, or persistence code exist yet.
 
 ## Completed
+
+### Domain Model Decision Phase
+- Full entity-by-entity Domain Model Analysis (User, Issue, Knowledge,
+  Comment, Project, Recommendation)
+- Issue status lifecycle resolved and documented in `docs/adr/ADR-0003-issue-lifecycle.md`
+- Knowledge moderation lifecycle resolved and documented in `docs/adr/ADR-0004-knowledge-lifecycle.md`
+- Issue↔Project relationship (cardinality, ownership, authority) resolved
+  in `docs/domain/domain-model.md`
+- Recommendation resolved as a derived, non-persisted service output
+- Cross-entity consistency review performed — no contradictions found
+- `docs/domain/decision-register.md` records the full disposition: locked
+  decisions, deferred items, implementation details, and the one
+  remaining open dependency
+- `docs/domain/domain-model.md` updated with resolved lifecycles and the
+  cross-entity principle (ownership/participation/contribution/governance/
+  verification are distinct forms of authority)
+
+**Open dependency carried forward, not resolved:** D-3a — the mechanism by
+which a user becomes an authorized remediation actor for
+`acknowledged → in_progress` and `in_progress → resolved` is deferred to
+the Project/Act authorization design. No role, assignment model, or
+membership-based authority has been invented to close it. This blocks
+final closure of the Issue authority matrix; it does not block persistence
+design from proceeding.
 
 ### Foundation Slice
 - Root app shell: `layout.tsx` with metadata, fonts (Space Grotesk,
@@ -46,7 +75,10 @@ Design System + Application Foundation — **COMPLETE**
 - `docs/engineering/testing.md`
 - `docs/adr/ADR-0001-new-repository.md`
 - `docs/adr/ADR-0002-backend-architecture.md`
+- `docs/adr/ADR-0003-issue-lifecycle.md`
+- `docs/adr/ADR-0004-knowledge-lifecycle.md`
 - `docs/domain/domain-model.md`
+- `docs/domain/decision-register.md`
 - `docs/architecture/nextjs-patterns.md`
 - `docs/future/parking-lot.md`
 
@@ -59,6 +91,17 @@ Design System + Application Foundation — **COMPLETE**
 
 - New repository over in-place migration (ADR-0001)
 - Keep Express as separate API service, same repository (ADR-0002)
+- Issue status lifecycle: 5-state, EXPERT-only verification,
+  resolver≠verifier hard invariant (ADR-0003)
+- Knowledge moderation lifecycle: revision-capable rejection, EXPERT-only
+  review, reviewer≠author hard invariant (ADR-0004)
+- Issue↔Project: `0..*` cardinality, immutable required origin reference,
+  no automatic authority from Project membership
+- Recommendation: derived service output, not a persisted entity
+- Domain/persistence boundary deliberately preserved throughout — domain
+  decisions (e.g. "status history has domain significance") are recorded
+  separately from persistence-shape decisions (embedded vs. referenced),
+  which are explicitly left to the Persistence Design milestone
 - Server Components by default; Client Components at the smallest boundary
 - Tailwind v4 CSS-first theming; semantic tokens only in components
 - Dependency policy: `package.json` reflects what's built today, never what's planned
@@ -71,23 +114,41 @@ Design System + Application Foundation — **COMPLETE**
 
 - `not-found.tsx` copy says "hasn't been built yet" — will need updating
   as real routes ship (acceptable for now, honest placeholder)
-- `server/` has no code yet — intentional, Domain Model milestone brings it
+- `server/` has no code yet — intentional, Persistence Design milestone
+  brings the first of it
+- **D-3a (remediation-assertion authority) remains unresolved** — not
+  technical debt in the usual sense, but an explicitly deferred domain
+  dependency. Do not resolve it by inventing a role, assignment model, or
+  membership-based authority without a dedicated Project/Act
+  authorization design session.
 
 ## Next Milestone
 
-**Domain Model** — Mongoose schemas for User, Issue, Knowledge, Comment,
-Project in `server/src/models/`. Mongoose connection singleton. Express app
-bootstrap with Helmet, rate limiting, CORS. Zod validation schemas.
-Correct from the start — no v1 bugs carried forward.
+**Persistence Design** (analysis phase, precedes schema implementation) —
+map the settled domain model onto MongoDB/Mongoose while preserving the
+domain decisions in ADR-0003, ADR-0004, and `docs/domain/domain-model.md`.
+Entity→collection mapping, embedded-vs-referenced relationships, status/
+review-history persistence shape, indexes, and the Zod/Mongoose validation
+boundary are analyzed and reviewed before any schema is written.
 
-After Domain Model: Authentication.
+After Persistence Design: Authentication.
 
 ## Reviewer Notes
 
-Design System + Foundation milestone reviewed and rated 9.8/10.
-Three post-review additions made:
-1. `product-invariants.md` extracted from domain-model.md into its own file
-2. `server/` directory established (same repo, sibling to `src/`)
-3. CLAUDE.md and README updated to reflect complete milestone state
+Design System + Foundation milestone reviewed and rated 9.8/10 (prior review).
 
-No open decisions remain. Ready to begin Domain Model milestone.
+Domain Model decision phase reviewed and accepted, with one substantive
+correction made during review (Knowledge approval authority corrected from
+EXPERT-or-ADMIN to EXPERT-only, to stay consistent with the Issue
+verification precedent and Product Invariant 9). Corrected consistently
+across `ADR-0004-knowledge-lifecycle.md`, `domain-model.md`, and
+`decision-register.md`; verified with a full cross-document consistency
+check afterward.
+
+D-3a is the sole remaining open domain dependency. It is intentionally
+unresolved, not overlooked — closing it requires a Project/Act
+authorization design this project doesn't have yet, and inventing an
+answer now would be exactly the premature-abstraction failure mode this
+project has been deliberately avoiding.
+
+Ready to begin Persistence Design (analysis phase).
