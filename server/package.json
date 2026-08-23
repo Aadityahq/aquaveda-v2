@@ -12,5 +12,10 @@
     "start": "node src/server.js",
     "seed:users": "node src/seed/seedUsers.js"
   },
-  "dependencies": {}
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "mongoose": "^8.4.0",
+    "zod": "^3.23.8"
+  }
 }
