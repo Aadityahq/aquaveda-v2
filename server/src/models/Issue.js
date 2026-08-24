@@ -36,7 +36,19 @@ const issueStatusHistoryEntrySchema = new Schema(
     fromStatus: {
       type: String,
       enum: [null, ...ISSUE_STATUSES],
-      default: null, // null only for the initial `null -> open` entry
+      default: null,
+      // The enum above only says "null is a structurally valid value for
+      // this field, generally." It does NOT and cannot express the actual
+      // domain rule: `fromStatus: null` is valid *only* for an Issue's
+      // first history entry (the `null -> open` creation event, per
+      // ADR-0005), and is invalid for every subsequent entry. Enforcing
+      // "null only on entry index 0" requires inspecting the rest of the
+      // array relative to this entry's position — a contextual,
+      // whole-document check, not a per-field constraint. This is a
+      // service-layer invariant (the `createIssue`/`changeStatus`
+      // operations are the only code paths that append to this array,
+      // and only `createIssue` may ever write `fromStatus: null`), not
+      // something this schema enforces or can enforce.
     },
     toStatus: {
       type: String,
@@ -97,10 +109,29 @@ const locationSchema = new Schema(
     coordinates: {
       type: [Number], // [longitude, latitude]
       required: true,
+      validate: {
+        validator: function (value) {
+          // Structural GeoJSON Point requirement only: exactly two
+          // finite numbers. This is a shape constraint, genuinely
+          // schema-enforceable without contextual/cross-document data.
+          return (
+            Array.isArray(value) &&
+            value.length === 2 &&
+            value.every((n) => typeof n === "number" && Number.isFinite(n))
+          );
+        },
+        message:
+          "coordinates must be an array of exactly two finite numbers [longitude, latitude]",
+      },
     },
   },
   { _id: false }
 );
+// Geographic range validation (longitude in [-180, 180], latitude in
+// [-90, 90]) is deliberately NOT enforced here — that belongs at the
+// Zod/service validation layer, consistent with persistence-design.md §7's
+// division: Mongoose owns structural shape, not domain-meaningful range
+// checks on otherwise-valid numbers.
 
 const issueSchema = new Schema(
   {

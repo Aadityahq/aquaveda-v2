@@ -38,6 +38,14 @@ const commentSchema = new Schema(
     refType: {
       type: String,
       enum: ["ISSUE", "WIKI"],
+      // "WIKI" (not "KNOWLEDGE") is the correct value here — verified
+      // against persistence-design.md §3/§10 and v1's proven API shape
+      // (`GET /api/v1/comments?refType=ISSUE|WIKI&refId=...`), both of
+      // which lock this exact discriminator value. The Knowledge
+      // collection's target-type name intentionally stays "WIKI" in this
+      // field even though the collection itself is named `Knowledge` —
+      // this is the locked terminology, not a naming inconsistency to
+      // silently "fix."
       required: true,
     },
     refId: {

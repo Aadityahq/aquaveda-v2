@@ -25,8 +25,11 @@ const { Schema } = mongoose;
  *   deliberately no `status`/`isActive` field exists on this schema)
  */
 
-const BIO_MAX_LENGTH = 500; // Not specified by any approved document —
-// chosen as a reasonable placeholder bound. Flagged for confirmation.
+const BIO_MAX_LENGTH = 500; // No approved document specifies this number.
+// A V2-level implementation placeholder only — not a locked domain
+// decision. Reasonable to keep for now (prevents unbounded free text),
+// but should not be treated as authoritative; revisit if any future
+// milestone needs a different bound.
 
 const userSchema = new Schema(
   {

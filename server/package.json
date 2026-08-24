@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "seed:users": "node src/seed/seedUsers.js"
+    "seed:users": "node src/seed/seedUsers.js",
+    "verify:models": "node scripts/verify-models.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

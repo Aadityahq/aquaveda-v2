@@ -31,10 +31,13 @@ const { Schema } = mongoose;
  * docs/domain/decision-register.md D-3a and ADR-0003.
  *
  * `progress` is not specified by any approved document beyond "creator-
- * controlled progress tracking." Implemented here as a plain free-text
- * String as the least-committal representation, since no structured
- * shape (e.g. percentage, milestone list) was ever locked. Flagged for
- * confirmation in the Phase B report.
+ * controlled progress tracking." No persistence document locks its shape.
+ * Implemented here as a plain free-text String as a V2-level placeholder
+ * only — this is an implementation choice, not a domain decision, and
+ * should not be read as settling what "progress" means for AquaVeda.
+ * A future milestone may replace this with a structured representation
+ * (percentage, milestone list, etc.) without that being an architectural
+ * reversal — flagged here so it isn't mistaken for one.
  */
 const projectSchema = new Schema(
   {
