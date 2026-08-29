@@ -1,3 +1,4 @@
+import "dotenv/config";
 import mongoose from "mongoose";
 
 /**
@@ -5,12 +6,22 @@ import mongoose from "mongoose";
  *
  * Responsibilities:
  * - one connection per process (no per-request connection creation)
- * - fail clearly if MONGO_URI is missing, rather than connecting to a
- *   silent default
+ * - fail clearly if the required env var is missing, rather than
+ *   connecting to a silent default
  * - surface connection errors instead of swallowing them
  * - expose a clean disconnect path for graceful shutdown
  *
  * This module does not know about Express, routes, or business logic.
+ *
+ * Environment loading lives HERE, not in server.js. This is the only
+ * module that actually needs env vars to connect, and it's imported by
+ * both the application entry point (server.js) and the test suite
+ * (tests/helpers/testDb.js) — anchoring the dotenv import at the point
+ * of consumption means every consumer gets a populated process.env
+ * regardless of which entry point they came through. `dotenv/config` is
+ * idempotent and a no-op when the vars are already present (e.g. CI
+ * environments that inject env vars directly), so this is safe to import
+ * unconditionally.
  */
 
 // Tracks an in-flight connection attempt so concurrent calls to connectDB()
@@ -33,8 +44,14 @@ function getRequiredEnv(name) {
  * Connect to MongoDB. Safe to call multiple times — returns the existing
  * connection if already connected, or the in-flight promise if a
  * connection attempt is already underway.
+ *
+ * @param {{ envVar?: string }} [options] - envVar selects which env var
+ *   holds the connection string. Defaults to MONGO_URI (application
+ *   runtime). Test code must pass `{ envVar: "TEST_MONGO_URI" }`
+ *   explicitly — there is no implicit fallback to MONGO_URI, so a test
+ *   run can never silently point at the development database.
  */
-export async function connectDB() {
+export async function connectDB({ envVar = "MONGO_URI" } = {}) {
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
@@ -43,7 +60,7 @@ export async function connectDB() {
     return connectionPromise;
   }
 
-  const uri = getRequiredEnv("MONGO_URI");
+  const uri = getRequiredEnv(envVar);
 
   mongoose.connection.on("error", (err) => {
     console.error("[db] MongoDB connection error:", err.message);

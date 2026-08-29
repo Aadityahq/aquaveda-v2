@@ -8,20 +8,38 @@ import { Project } from "../../src/models/Project.js";
 /**
  * Test helper for service-layer tests.
  *
- * Deliberately uses a REAL MongoDB connection (via MONGO_URI, the same
- * env var db.js already uses in normal operation) rather than mocking
+ * Deliberately uses a REAL MongoDB connection (via TEST_MONGO_URI, kept
+ * separate from the application's MONGO_URI) rather than mocking
  * Mongoose or faking the conditional-update mechanism with an in-memory
  * boolean. The concurrency tests specifically depend on this — they only
  * mean something if MongoDB itself is serializing the conditional writes,
  * not a test double pretending to.
  *
- * Requires a running MongoDB instance and MONGO_URI set in the
- * environment before running (see server/README.md). This is the same
- * database setup already verified working locally in Phase A.
+ * connectDB() loads dotenv itself (see src/config/db.js), so no separate
+ * env-loading step is needed here regardless of whether this file is
+ * reached via `npm test` or any other entry point.
+ *
+ * TEST_MONGO_URI is required and must differ from MONGO_URI — tests must
+ * never run against the development database. This is enforced below,
+ * not just documented.
+ *
+ * Requires a running MongoDB instance and TEST_MONGO_URI set in the
+ * environment before running (see server/README.md).
  */
 
 export async function setupTestDb() {
-  await connectDB();
+  if (
+    process.env.TEST_MONGO_URI &&
+    process.env.MONGO_URI &&
+    process.env.TEST_MONGO_URI === process.env.MONGO_URI
+  ) {
+    throw new Error(
+      "TEST_MONGO_URI must not be the same as MONGO_URI — refusing to " +
+        "run tests against the development database."
+    );
+  }
+
+  await connectDB({ envVar: "TEST_MONGO_URI" });
 }
 
 export async function teardownTestDb() {

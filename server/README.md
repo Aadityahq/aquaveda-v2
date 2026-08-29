@@ -55,6 +55,7 @@ specification, not as code to port.
 ```env
 PORT=5000
 MONGO_URI=mongodb://localhost:27017/aquaveda_v2
+TEST_MONGO_URI=mongodb://localhost:27017/aquaveda_v2_test   # required for `npm test`; must differ from MONGO_URI
 CLIENT_URL=http://localhost:3000
 ALLOWED_ORIGINS=http://localhost:3000
 JWT_SECRET=           # generate: openssl rand -base64 32
@@ -65,6 +66,17 @@ RATE_LIMIT_MAX=200
 AUTH_RATE_LIMIT_WINDOW_MS=900000
 AUTH_RATE_LIMIT_MAX=20
 ```
+
+Env vars are loaded by `src/config/db.js` itself (via `dotenv/config`),
+not by `server.js`. Both the app entry point and the test suite import
+`db.js` (directly or via `tests/helpers/testDb.js`), so `.env` is loaded
+consistently regardless of entry point — no per-file `dotenv.config()`
+calls needed elsewhere.
+
+`connectDB()` defaults to `MONGO_URI`. The test helper explicitly passes
+`{ envVar: "TEST_MONGO_URI" }` and refuses to run if `TEST_MONGO_URI`
+equals `MONGO_URI`, so `npm test` can never silently operate against the
+development database.
 
 ## Known v1 bugs that do NOT carry forward
 

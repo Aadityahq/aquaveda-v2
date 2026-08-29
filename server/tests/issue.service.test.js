@@ -123,20 +123,7 @@ describe("issue.service — changeStatus: legal transitions", () => {
     // the model is the correct way to test the transition THIS service
     // operation actually can perform (resolved -> verified), without
     // pretending D-3a is solved.
-    await Issue.updateOne(
-      { _id: issue._id },
-      {
-        $set: { status: "resolved" },
-        $push: {
-          statusHistory: {
-            fromStatus: "in_progress",
-            toStatus: "resolved",
-            actor: expertA.id,
-            timestamp: new Date(),
-          },
-        },
-      }
-    );
+    await forceStatus(issue._id, "resolved", expertA.id);
 
     const expertB = fakeActor("EXPERT");
     const updated = await changeStatus(expertB, issue._id, "verified");
@@ -150,20 +137,7 @@ describe("issue.service — changeStatus: legal transitions", () => {
   it("resolved -> in_progress (failed verification) succeeds for an EXPERT", async () => {
     const issue = await makeOpenIssue();
     const resolver = fakeActor("USER");
-    await Issue.updateOne(
-      { _id: issue._id },
-      {
-        $set: { status: "resolved" },
-        $push: {
-          statusHistory: {
-            fromStatus: "in_progress",
-            toStatus: "resolved",
-            actor: resolver.id,
-            timestamp: new Date(),
-          },
-        },
-      }
-    );
+    await forceStatus(issue._id, "resolved", resolver.id);
 
     const expert = fakeActor("EXPERT");
     const updated = await changeStatus(expert, issue._id, "in_progress");
@@ -222,20 +196,7 @@ describe("issue.service — authorization", () => {
 
   it("resolved -> verified fails for a non-EXPERT", async () => {
     const issue = await makeOpenIssue();
-    await Issue.updateOne(
-      { _id: issue._id },
-      {
-        $set: { status: "resolved" },
-        $push: {
-          statusHistory: {
-            fromStatus: "in_progress",
-            toStatus: "resolved",
-            actor: fakeActor().id,
-            timestamp: new Date(),
-          },
-        },
-      }
-    );
+    await forceStatus(issue._id, "resolved", fakeActor().id);
     await assert.rejects(
       () => changeStatus(fakeActor("USER"), issue._id, "verified"),
       (err) => {
@@ -248,20 +209,7 @@ describe("issue.service — authorization", () => {
   it("resolved -> verified fails when the verifier is the same actor as the resolver", async () => {
     const issue = await makeOpenIssue();
     const expert = fakeActor("EXPERT");
-    await Issue.updateOne(
-      { _id: issue._id },
-      {
-        $set: { status: "resolved" },
-        $push: {
-          statusHistory: {
-            fromStatus: "in_progress",
-            toStatus: "resolved",
-            actor: expert.id,
-            timestamp: new Date(),
-          },
-        },
-      }
-    );
+    await forceStatus(issue._id, "resolved", expert.id);
 
     await assert.rejects(
       () => changeStatus(expert, issue._id, "verified"),
@@ -362,20 +310,7 @@ describe("issue.service — not found and state race", () => {
   it("state-race: two concurrent resolved->verified attempts by different Experts — exactly one succeeds", async () => {
     const issue = await makeOpenIssue();
     const resolver = fakeActor("USER");
-    await Issue.updateOne(
-      { _id: issue._id },
-      {
-        $set: { status: "resolved" },
-        $push: {
-          statusHistory: {
-            fromStatus: "in_progress",
-            toStatus: "resolved",
-            actor: resolver.id,
-            timestamp: new Date(),
-          },
-        },
-      }
-    );
+    await forceStatus(issue._id, "resolved", resolver.id);
 
     const expertA = fakeActor("EXPERT");
     const expertB = fakeActor("EXPERT");
@@ -391,19 +326,21 @@ describe("issue.service — not found and state race", () => {
     const reloaded = await Issue.findById(issue._id);
     assert.equal(reloaded.status, "verified");
 
-    // The fixture already contains two entries before either concurrent
-    // call fires (creation's null->open, then the direct-update
-    // in_progress->resolved). One winning verification adds a third.
-    // Asserting the full sequence, not just the length, catches a wider
-    // class of bug than a bare count would (e.g. a duplicate entry with
-    // the wrong fromStatus wouldn't change the length but would change
-    // this sequence).
+    // The fixture already contains four entries before either concurrent
+    // call fires (creation's null->open, then forceStatus's legal walk
+    // through open->acknowledged->in_progress->resolved). One winning
+    // verification adds a fifth. Asserting the full sequence, not just
+    // the length, catches a wider class of bug than a bare count would
+    // (e.g. a duplicate entry with the wrong fromStatus wouldn't change
+    // the length but would change this sequence).
     const sequence = reloaded.statusHistory.map((entry) => ({
       fromStatus: entry.fromStatus,
       toStatus: entry.toStatus,
     }));
     assert.deepEqual(sequence, [
       { fromStatus: null, toStatus: "open" },
+      { fromStatus: "open", toStatus: "acknowledged" },
+      { fromStatus: "acknowledged", toStatus: "in_progress" },
       { fromStatus: "in_progress", toStatus: "resolved" },
       { fromStatus: "resolved", toStatus: "verified" },
     ]);
