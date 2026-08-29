@@ -1,6 +1,7 @@
 # ADR-0005: Embedded lifecycle and review history for Issue and Knowledge
 
 ## Status
+
 Accepted.
 
 ## Context
@@ -34,12 +35,12 @@ document. Each entry records one status transition.
 
 **Minimum required fields per entry:**
 
-| Field | Meaning |
-|---|---|
-| `fromStatus` | The status immediately before this transition |
-| `toStatus` | The status after this transition |
-| `actor` | Reference to the User who performed the transition |
-| `timestamp` | When the transition occurred (explicit field, not Mongoose auto-timestamp, so it unambiguously represents transition time) |
+| Field        | Meaning                                                                                                                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `fromStatus` | The status immediately before this transition                                                                              |
+| `toStatus`   | The status after this transition                                                                                           |
+| `actor`      | Reference to the User who performed the transition                                                                         |
+| `timestamp`  | When the transition occurred (explicit field, not Mongoose auto-timestamp, so it unambiguously represents transition time) |
 
 **Initial entry:** `statusHistory` includes an entry for Issue creation,
 recording `null → open` with the reporting user as actor and the Issue's
@@ -71,14 +72,14 @@ Knowledge document. Each entry records one review decision.
 
 **Minimum required fields per entry:**
 
-| Field | Meaning |
-|---|---|
-| `decision` | `approved` or `rejected` |
-| `reviewer` | Reference to the Expert who made the decision |
-| `feedback` | Required when `decision` is `rejected`; not applicable for `approved` |
+| Field       | Meaning                                                                |
+| ----------- | ---------------------------------------------------------------------- |
+| `decision`  | `approved` or `rejected`                                               |
+| `reviewer`  | Reference to the Expert who made the decision                          |
+| `feedback`  | Required when `decision` is `rejected`; not applicable for `approved`  |
 | `timestamp` | When the review decision was made (explicit field, not auto-timestamp) |
 
-**Scope of entries:** `reviewHistory` records review *decisions* only —
+**Scope of entries:** `reviewHistory` records review _decisions_ only —
 `approved` and `rejected` events. It does not contain synthetic entries
 for `draft` creation or `pending_review` submission. Before any review
 has occurred, `reviewHistory` is correctly an empty array. This is a

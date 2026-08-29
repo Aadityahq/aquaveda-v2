@@ -1,6 +1,7 @@
 # ADR-0002: Keep Express as a separate API service
 
 ## Status
+
 Accepted
 
 ## Context

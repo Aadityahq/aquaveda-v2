@@ -11,7 +11,10 @@ import { cn } from "@/lib/utils";
  * Server Component by default (no interactivity) — safe to use inside
  * loading.tsx and Suspense fallbacks without a "use client" boundary.
  */
-export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function Skeleton({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn("bg-muted animate-pulse rounded-md", className)}

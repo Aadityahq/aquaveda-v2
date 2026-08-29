@@ -90,29 +90,33 @@ export async function submitForReview(actorContext, knowledgeId) {
     // graph" is even the right mental model for that operation.
     throw invalidState(
       `submitForReview requires status "draft", found "${knowledge.status}"`,
-      { expected: "draft", actual: knowledge.status }
+      { expected: "draft", actual: knowledge.status },
     );
   }
 
   if (String(knowledge.author) !== String(actorContext.id)) {
-    throw forbidden("only the author may submit a Knowledge article for review");
+    throw forbidden(
+      "only the author may submit a Knowledge article for review",
+    );
   }
 
   const updated = await Knowledge.findOneAndUpdate(
     { _id: knowledgeId, status: "draft" },
     { $set: { status: "pending_review" } },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   if (updated) return updated;
 
   const stillExists = await Knowledge.exists({ _id: knowledgeId });
   if (!stillExists) {
-    throw notFound(`Knowledge ${knowledgeId} was deleted before submission completed`);
+    throw notFound(
+      `Knowledge ${knowledgeId} was deleted before submission completed`,
+    );
   }
   throw stateRace(
     `Knowledge ${knowledgeId} status changed before submission could be applied`,
-    { expectedStatus: "draft", targetStatus: "pending_review" }
+    { expectedStatus: "draft", targetStatus: "pending_review" },
   );
 }
 
@@ -141,7 +145,7 @@ export async function approve(actorContext, knowledgeId) {
   if (knowledge.status !== "pending_review") {
     throw invalidState(
       `approve requires status "pending_review", found "${knowledge.status}"`,
-      { expected: "pending_review", actual: knowledge.status }
+      { expected: "pending_review", actual: knowledge.status },
     );
   }
 
@@ -166,18 +170,20 @@ export async function approve(actorContext, knowledgeId) {
         },
       },
     },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   if (updated) return updated;
 
   const stillExists = await Knowledge.exists({ _id: knowledgeId });
   if (!stillExists) {
-    throw notFound(`Knowledge ${knowledgeId} was deleted before approval completed`);
+    throw notFound(
+      `Knowledge ${knowledgeId} was deleted before approval completed`,
+    );
   }
   throw stateRace(
     `Knowledge ${knowledgeId} status changed before approval could be applied`,
-    { expectedStatus: "pending_review", targetStatus: "approved" }
+    { expectedStatus: "pending_review", targetStatus: "approved" },
   );
 }
 
@@ -207,7 +213,7 @@ export async function reject(actorContext, knowledgeId, feedback) {
   if (knowledge.status !== "pending_review") {
     throw invalidState(
       `reject requires status "pending_review", found "${knowledge.status}"`,
-      { expected: "pending_review", actual: knowledge.status }
+      { expected: "pending_review", actual: knowledge.status },
     );
   }
 
@@ -241,18 +247,20 @@ export async function reject(actorContext, knowledgeId, feedback) {
         },
       },
     },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   if (updated) return updated;
 
   const stillExists = await Knowledge.exists({ _id: knowledgeId });
   if (!stillExists) {
-    throw notFound(`Knowledge ${knowledgeId} was deleted before rejection completed`);
+    throw notFound(
+      `Knowledge ${knowledgeId} was deleted before rejection completed`,
+    );
   }
   throw stateRace(
     `Knowledge ${knowledgeId} status changed before rejection could be applied`,
-    { expectedStatus: "pending_review", targetStatus: "rejected" }
+    { expectedStatus: "pending_review", targetStatus: "rejected" },
   );
 }
 
@@ -283,12 +291,14 @@ export async function revise(actorContext, knowledgeId, updatedContent) {
   if (knowledge.status !== "rejected") {
     throw invalidState(
       `revise requires status "rejected", found "${knowledge.status}"`,
-      { expected: "rejected", actual: knowledge.status }
+      { expected: "rejected", actual: knowledge.status },
     );
   }
 
   if (String(knowledge.author) !== String(actorContext.id)) {
-    throw forbidden("only the author may revise a rejected Knowledge submission");
+    throw forbidden(
+      "only the author may revise a rejected Knowledge submission",
+    );
   }
 
   const allowedFields = {};
@@ -305,17 +315,19 @@ export async function revise(actorContext, knowledgeId, updatedContent) {
   const updated = await Knowledge.findOneAndUpdate(
     { _id: knowledgeId, status: "rejected" },
     { $set: { ...allowedFields, status: "draft" } },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   if (updated) return updated;
 
   const stillExists = await Knowledge.exists({ _id: knowledgeId });
   if (!stillExists) {
-    throw notFound(`Knowledge ${knowledgeId} was deleted before revision completed`);
+    throw notFound(
+      `Knowledge ${knowledgeId} was deleted before revision completed`,
+    );
   }
   throw stateRace(
     `Knowledge ${knowledgeId} status changed before revision could be applied`,
-    { expectedStatus: "rejected", targetStatus: "draft" }
+    { expectedStatus: "rejected", targetStatus: "draft" },
   );
 }

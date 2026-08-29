@@ -4,7 +4,14 @@ import assert from "node:assert/strict";
 import { Issue } from "../src/models/Issue.js";
 import { createIssue, changeStatus } from "../src/services/issue.service.js";
 import { DomainErrorCode } from "../src/services/errors.js";
-import { setupTestDb, teardownTestDb, clearCollections, fakeActor, fakeObjectId, validPoint } from "./helpers/testDb.js";
+import {
+  setupTestDb,
+  teardownTestDb,
+  clearCollections,
+  fakeActor,
+  fakeObjectId,
+  validPoint,
+} from "./helpers/testDb.js";
 
 before(setupTestDb);
 after(teardownTestDb);
@@ -36,7 +43,13 @@ async function makeOpenIssue(reporter = fakeActor("USER")) {
  * "open" up to whatever status is requested, appending one legitimate
  * transition entry per step. Kept local to this file.
  */
-const ISSUE_STATUS_CHAIN = ["open", "acknowledged", "in_progress", "resolved", "verified"];
+const ISSUE_STATUS_CHAIN = [
+  "open",
+  "acknowledged",
+  "in_progress",
+  "resolved",
+  "verified",
+];
 
 async function forceStatus(issueId, status, actorId = fakeActor("USER").id) {
   if (status === "open") return; // creation already leaves the Issue here
@@ -63,7 +76,7 @@ async function forceStatus(issueId, status, actorId = fakeActor("USER").id) {
       $push: {
         statusHistory: { $each: entries },
       },
-    }
+    },
   );
 }
 
@@ -93,7 +106,9 @@ describe("issue.service — createIssue", () => {
       description: "d",
       location: validPoint(),
       status: "verified", // should be ignored entirely
-      statusHistory: [{ fromStatus: "open", toStatus: "verified", actor: reporter.id }],
+      statusHistory: [
+        { fromStatus: "open", toStatus: "verified", actor: reporter.id },
+      ],
     });
     assert.equal(issue.status, "open");
     assert.equal(issue.statusHistory.length, 1);
@@ -170,7 +185,7 @@ describe("issue.service — changeStatus: illegal transitions", () => {
         (err) => {
           assert.equal(err.code, DomainErrorCode.INVALID_STATE);
           return true;
-        }
+        },
       );
     });
   }
@@ -178,7 +193,9 @@ describe("issue.service — changeStatus: illegal transitions", () => {
   it("verified is terminal — no transition out of it succeeds", async () => {
     const issue = await makeOpenIssue();
     await forceStatus(issue._id, "verified");
-    await assert.rejects(() => changeStatus(fakeActor("EXPERT"), issue._id, "resolved"));
+    await assert.rejects(() =>
+      changeStatus(fakeActor("EXPERT"), issue._id, "resolved"),
+    );
   });
 });
 
@@ -190,7 +207,7 @@ describe("issue.service — authorization", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.FORBIDDEN);
         return true;
-      }
+      },
     );
   });
 
@@ -202,7 +219,7 @@ describe("issue.service — authorization", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.FORBIDDEN);
         return true;
-      }
+      },
     );
   });
 
@@ -216,7 +233,7 @@ describe("issue.service — authorization", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.FORBIDDEN);
         return true;
-      }
+      },
     );
   });
 });
@@ -230,10 +247,13 @@ describe("issue.service — D-3a: unresolved authorization policy", () => {
       await assert.rejects(
         () => changeStatus(fakeActor(role), issue._id, "in_progress"),
         (err) => {
-          assert.equal(err.code, DomainErrorCode.AUTHORIZATION_POLICY_UNRESOLVED);
+          assert.equal(
+            err.code,
+            DomainErrorCode.AUTHORIZATION_POLICY_UNRESOLVED,
+          );
           return true;
         },
-        `role ${role} should not be silently authorized`
+        `role ${role} should not be silently authorized`,
       );
     }
   });
@@ -246,10 +266,13 @@ describe("issue.service — D-3a: unresolved authorization policy", () => {
       await assert.rejects(
         () => changeStatus(fakeActor(role), issue._id, "resolved"),
         (err) => {
-          assert.equal(err.code, DomainErrorCode.AUTHORIZATION_POLICY_UNRESOLVED);
+          assert.equal(
+            err.code,
+            DomainErrorCode.AUTHORIZATION_POLICY_UNRESOLVED,
+          );
           return true;
         },
-        `role ${role} should not be silently authorized`
+        `role ${role} should not be silently authorized`,
       );
     }
   });
@@ -259,7 +282,9 @@ describe("issue.service — D-3a: unresolved authorization policy", () => {
     await forceStatus(issue._id, "acknowledged");
     const before = await Issue.findById(issue._id).lean();
 
-    await assert.rejects(() => changeStatus(fakeActor("EXPERT"), issue._id, "in_progress"));
+    await assert.rejects(() =>
+      changeStatus(fakeActor("EXPERT"), issue._id, "in_progress"),
+    );
 
     const after = await Issue.findById(issue._id).lean();
     assert.equal(after.status, "acknowledged");
@@ -279,7 +304,7 @@ describe("issue.service — not found and state race", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.NOT_FOUND);
         return true;
-      }
+      },
     );
   });
 
@@ -296,8 +321,16 @@ describe("issue.service — not found and state race", () => {
     const succeeded = results.filter((r) => r.status === "fulfilled");
     const failed = results.filter((r) => r.status === "rejected");
 
-    assert.equal(succeeded.length, 1, "exactly one of the two concurrent attempts should succeed");
-    assert.equal(failed.length, 1, "exactly one of the two concurrent attempts should fail");
+    assert.equal(
+      succeeded.length,
+      1,
+      "exactly one of the two concurrent attempts should succeed",
+    );
+    assert.equal(
+      failed.length,
+      1,
+      "exactly one of the two concurrent attempts should fail",
+    );
     assert.equal(failed[0].reason.code, DomainErrorCode.STATE_RACE);
 
     const reloaded = await Issue.findById(issue._id);
@@ -350,6 +383,9 @@ describe("issue.service — not found and state race", () => {
     // hardcoded assumption about which one wins the race.
     const winner = succeeded[0].value;
     const lastEntry = reloaded.statusHistory[reloaded.statusHistory.length - 1];
-    assert.equal(String(lastEntry.actor), String(winner.statusHistory.at(-1).actor));
+    assert.equal(
+      String(lastEntry.actor),
+      String(winner.statusHistory.at(-1).actor),
+    );
   });
 });

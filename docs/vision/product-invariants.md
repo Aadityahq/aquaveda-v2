@@ -2,7 +2,7 @@
 
 Framework-independent truths about how AquaVeda works. They survive
 rewrites, redesigns, and platform changes because they describe the
-*product*, not any implementation of it.
+_product_, not any implementation of it.
 
 Changing one is a product decision that requires a new ADR — it does not
 happen as a side effect of a feature ticket or an architectural refactor.

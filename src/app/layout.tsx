@@ -37,7 +37,11 @@ export const metadata: Metadata = {
     "A geo-intelligent civic reporting and knowledge platform. Water is the flagship domain.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body

@@ -261,17 +261,21 @@ At minimum include:
 
 ```markdown
 ## Summary
+
 - What changed?
 
 ## Related Issue
+
 Closes #123
 
 ## Testing
+
 - `npm run typecheck`
 - `npm run lint`
 - Manual verification of ...
 
 ## Notes
+
 - Important implementation decisions
 - Known limitations
 - Anything intentionally deferred

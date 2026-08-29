@@ -15,6 +15,7 @@ test suite green, including all three concurrency tests.
 ## Completed
 
 ### Domain Model Decision Phase
+
 - Full entity-by-entity Domain Model Analysis (User, Issue, Knowledge,
   Comment, Project, Recommendation)
 - Issue status lifecycle resolved and documented in `docs/adr/ADR-0003-issue-lifecycle.md`
@@ -39,6 +40,7 @@ final closure of the Issue authority matrix; it does not block persistence
 design from proceeding.
 
 ### Persistence Design
+
 - Five collections mapped: User, Issue, Knowledge, Comment, Project.
   Recommendation stays unpersisted (derived service output)
 - Embedded status/review history (ADR-0005), conditional atomic lifecycle
@@ -46,6 +48,7 @@ design from proceeding.
 - `docs/architecture/persistence-design.md` (approved)
 
 ### Phase D — Service Implementation
+
 - `server/src/services/`: `issue.service.js` (createIssue, changeStatus),
   `knowledge.service.js` (createKnowledge, submitForReview, approve,
   reject, revise), `comment.service.js` (createComment),
@@ -57,7 +60,7 @@ design from proceeding.
   role. No one can move an Issue past `acknowledged` through the service
   layer yet; this is intentional, not a bug
 - Actor context boundary: every service takes `actorContext = { id,
-  role }` as an opaque input; services never touch JWTs/headers/sessions
+role }` as an opaque input; services never touch JWTs/headers/sessions
 - D-COMMENT-1 locked and tested: replies must target the same
   `(refType, refId)` as their parent; cross-target and reply-to-reply
   both rejected
@@ -76,6 +79,7 @@ design from proceeding.
   §Phase D
 
 ### Foundation Slice
+
 - Root app shell: `layout.tsx` with metadata, fonts (Space Grotesk,
   IBM Plex Sans, IBM Plex Mono via `next/font/google`), Navbar, Footer
 - ThemeProvider boundary (Client Component, isolated from Server layout)
@@ -88,6 +92,7 @@ design from proceeding.
   → `FoundationRefreshButton` (client refetch via `useTransition`)
 
 ### UI Primitives
+
 - `Button` (variant + size CVA, `asChild` via Radix Slot)
 - `Card` + `CardHeader` + `CardTitle` + `CardDescription` + `CardContent` + `CardFooter`
 - `Badge` (domain-aware variants: `default`, `verified`, `warning`, `critical`, `outline`)
@@ -98,6 +103,7 @@ design from proceeding.
 - `Avatar` + `AvatarImage` + `AvatarFallback` (Radix-backed)
 
 ### Layout
+
 - `Navbar` (Server Component, desktop nav)
 - `ThemeToggle` (Client Component, hydration guard, Sun/Moon icons)
 - `MobileNav` (Client Component, Radix Dialog drawer, auto-close on route
@@ -105,6 +111,7 @@ design from proceeding.
 - `Footer`
 
 ### Documentation
+
 - `docs/vision/vision.md`
 - `docs/vision/principles.md`
 - `docs/vision/product-invariants.md` (standalone — constitutional rules
@@ -121,6 +128,7 @@ design from proceeding.
 - `docs/future/parking-lot.md`
 
 ### Repository layout
+
 - `server/` sibling directory established with `package.json` and milestone
   build plan in `server/README.md` — backend built here, not in a separate repo.
   Future evolution path: `apps/web` + `apps/server` workspace layout.

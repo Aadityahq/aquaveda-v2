@@ -62,7 +62,7 @@ const reviewHistoryEntrySchema = new Schema(
       default: Date.now,
     },
   },
-  { _id: true }
+  { _id: true },
 );
 
 /**
@@ -121,7 +121,7 @@ const knowledgeSchema = new Schema(
       default: [],
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Approved indexes only (persistence-design.md §6 / ADR-0005):

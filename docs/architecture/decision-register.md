@@ -27,16 +27,16 @@ fully closed project state, only of the decisions made so far.
 ## 🔒 Locked — Domain Model (see ADR-0003, ADR-0004, `domain-model.md`)
 
 - Issue lifecycle: 5-state graph, transition authority, `resolverId !==
-  verifierId`, EXPERT-only verification, `acknowledged` mandatory,
+verifierId`, EXPERT-only verification, `acknowledged` mandatory,
   failed-verification routes to `in_progress` only, `verified` terminal
   for V2.
 - Knowledge lifecycle: `draft → pending_review → approved | rejected →
-  draft`, EXPERT-only review authority, `reviewerId !== authorId`,
+draft`, EXPERT-only review authority, `reviewerId !== authorId`,
   mandatory rejection feedback, content locked during `pending_review`, no
   re-review of approved content in V2.
 - Issue ↔ Project: `Issue 0..* Project`, immutable required origin
   reference, creation gated to Issue status ∈ `{acknowledged, in_progress,
-  resolved, verified}`, independent ownership, independent lifecycles, no
+resolved, verified}`, independent ownership, independent lifecycles, no
   automatic Issue authority from Project membership.
 - Recommendation: derived service output, no persistence, no
   ownership/lifecycle/authority, Invariant 7 as a service-boundary
@@ -57,7 +57,7 @@ fully closed project state, only of the decisions made so far.
   Model milestone's rejection of a generic history primitive, ADR-0005).
 - `Issue.statusHistory` includes the initial creation entry —
   `{fromStatus: null, toStatus: "open", actor: reportedBy, timestamp:
-  createdAt}` — so it is the complete lifecycle log, not just
+createdAt}` — so it is the complete lifecycle log, not just
   post-creation transitions. `Knowledge.reviewHistory` records review
   decisions only (approve/reject), with no synthetic entry for
   `draft`/`pending_review`.
@@ -127,7 +127,7 @@ suite green, including all three concurrency tests (Issue
 - **`AUTHORIZATION_POLICY_UNRESOLVED` is D-3a made concrete.**
   `changeStatus()` throws this error, distinct from `FORBIDDEN`, for
   every attempt at `acknowledged → in_progress` or `in_progress →
-  resolved`, unconditionally, for every role. No one can move an Issue
+resolved`, unconditionally, for every role. No one can move an Issue
   past `acknowledged` through the service layer. This is working-as-
   designed, not a bug — do not close it by inventing a `REMEDIATOR`
   role, Project-membership authority, or any assignment model. D-3a is
@@ -157,7 +157,7 @@ suite green, including all three concurrency tests (Issue
     only in `server.js`. The test suite imports `db.js` directly via
     `testDb.js` and never touches `server.js`, so `process.env` was
     never populated when running `npm test` — failing with `Missing
-    required environment variable: MONGO_URI` even though `.env` was
+required environment variable: MONGO_URI` even though `.env` was
     correct and the app connected fine under `npm start`.
   - **Do not** remove the `dotenv/config` import from `db.js` as
     apparently-unused or redundant with `server.js`'s own import — it
@@ -178,16 +178,16 @@ suite green, including all three concurrency tests (Issue
 
 ## ⏸️ Deferred
 
-| Item | Note |
-|---|---|
-| User suspension/deactivation | No current requirement; adding a status field now would be speculative |
-| Expert role acquisition mechanism | Belongs to the Authentication/Governance milestone — `role: EXPERT` as a fact is established, the assignment *process* is not |
-| Comment deletion (soft/hard) | No v1 precedent, no current requirement |
-| Project status field | Explicitly decided against for V2; revisit only if the Act milestone proves a need |
-| Leaving a project | No v1 precedent, no current requirement |
-| Admin governance of already-approved Knowledge | Real future need, not solved by extending approval authority now |
-| Re-review of approved Knowledge | Out of scope for V2 |
-| Issue recurrence / reopening `verified` | Parked; a future `relatedIssue` reference is the likely shape, not un-terminaling `verified` |
+| Item                                           | Note                                                                                                                          |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| User suspension/deactivation                   | No current requirement; adding a status field now would be speculative                                                        |
+| Expert role acquisition mechanism              | Belongs to the Authentication/Governance milestone — `role: EXPERT` as a fact is established, the assignment _process_ is not |
+| Comment deletion (soft/hard)                   | No v1 precedent, no current requirement                                                                                       |
+| Project status field                           | Explicitly decided against for V2; revisit only if the Act milestone proves a need                                            |
+| Leaving a project                              | No v1 precedent, no current requirement                                                                                       |
+| Admin governance of already-approved Knowledge | Real future need, not solved by extending approval authority now                                                              |
+| Re-review of approved Knowledge                | Out of scope for V2                                                                                                           |
+| Issue recurrence / reopening `verified`        | Parked; a future `relatedIssue` reference is the likely shape, not un-terminaling `verified`                                  |
 
 ## 🔧 Implementation detail (resolved when the relevant schema is written, no ADR needed)
 

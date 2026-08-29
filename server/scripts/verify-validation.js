@@ -17,7 +17,10 @@
 
 import assert from "node:assert/strict";
 
-import { createIssueSchema, changeIssueStatusSchema } from "../src/validation/issue.validation.js";
+import {
+  createIssueSchema,
+  changeIssueStatusSchema,
+} from "../src/validation/issue.validation.js";
 import {
   createKnowledgeSchema,
   reviewKnowledgeSchema,
@@ -79,22 +82,25 @@ check("1d. Issue payload missing location fails", () => {
   assert.equal(result.success, false);
 });
 
-check("1e. Issue payload accepts optional severity/category, and works without them", () => {
-  const withOptional = createIssueSchema.safeParse({
-    title: "Broken pipeline",
-    description: "Water leaking near the main road",
-    location: validPoint([77.5, 12.9]),
-    severity: "high",
-    category: "infrastructure",
-  });
-  const withoutOptional = createIssueSchema.safeParse({
-    title: "Broken pipeline",
-    description: "Water leaking near the main road",
-    location: validPoint([77.5, 12.9]),
-  });
-  assert.equal(withOptional.success, true);
-  assert.equal(withoutOptional.success, true);
-});
+check(
+  "1e. Issue payload accepts optional severity/category, and works without them",
+  () => {
+    const withOptional = createIssueSchema.safeParse({
+      title: "Broken pipeline",
+      description: "Water leaking near the main road",
+      location: validPoint([77.5, 12.9]),
+      severity: "high",
+      category: "infrastructure",
+    });
+    const withoutOptional = createIssueSchema.safeParse({
+      title: "Broken pipeline",
+      description: "Water leaking near the main road",
+      location: validPoint([77.5, 12.9]),
+    });
+    assert.equal(withOptional.success, true);
+    assert.equal(withoutOptional.success, true);
+  },
+);
 
 // ---------------------------------------------------------------------
 // 2. Longitude / latitude boundaries
@@ -131,9 +137,12 @@ check("2g. Latitude -90.0001 is invalid (just outside boundary)", () => {
 check("2h. Latitude 90.0001 is invalid (just outside boundary)", () => {
   assert.equal(issueWithCoords([0, 90.0001]).success, false);
 });
-check("2i. Coordinate tuple with wrong length is invalid (Zod tuple arity)", () => {
-  assert.equal(issueWithCoords([77.5]).success, false);
-});
+check(
+  "2i. Coordinate tuple with wrong length is invalid (Zod tuple arity)",
+  () => {
+    assert.equal(issueWithCoords([77.5]).success, false);
+  },
+);
 
 // ---------------------------------------------------------------------
 // 3. Invalid ObjectIds
@@ -142,13 +151,19 @@ check("3a. Valid 24-hex-char ObjectId string passes", () => {
   assert.equal(objectIdString.safeParse(VALID_OID).success, true);
 });
 check("3b. Too-short ObjectId string fails", () => {
-  assert.equal(objectIdString.safeParse("507f1f77bcf86cd79943901").success, false);
+  assert.equal(
+    objectIdString.safeParse("507f1f77bcf86cd79943901").success,
+    false,
+  );
 });
 check("3c. Too-long ObjectId string fails", () => {
   assert.equal(objectIdString.safeParse(VALID_OID + "a").success, false);
 });
 check("3d. Non-hex ObjectId string fails", () => {
-  assert.equal(objectIdString.safeParse("not-an-objectid-string!!").success, false);
+  assert.equal(
+    objectIdString.safeParse("not-an-objectid-string!!").success,
+    false,
+  );
 });
 check("3e. Empty string fails", () => {
   assert.equal(objectIdString.safeParse("").success, false);
@@ -177,13 +192,16 @@ check("4c. Review decision 'approved' without feedback passes", () => {
   assert.equal(result.success, true);
 });
 
-check("4d. Review decision 'approved' WITH feedback also passes (feedback is optional, not forbidden)", () => {
-  const result = reviewKnowledgeSchema.safeParse({
-    decision: "approved",
-    feedback: "great article, minor style notes",
-  });
-  assert.equal(result.success, true);
-});
+check(
+  "4d. Review decision 'approved' WITH feedback also passes (feedback is optional, not forbidden)",
+  () => {
+    const result = reviewKnowledgeSchema.safeParse({
+      decision: "approved",
+      feedback: "great article, minor style notes",
+    });
+    assert.equal(result.success, true);
+  },
+);
 
 check("4e. Review decision with invalid enum value fails", () => {
   const result = reviewKnowledgeSchema.safeParse({ decision: "maybe" });
@@ -202,22 +220,33 @@ check("5a. Review decision 'rejected' WITH non-empty feedback passes", () => {
 check("5b. Review decision 'rejected' WITHOUT feedback fails", () => {
   const result = reviewKnowledgeSchema.safeParse({ decision: "rejected" });
   assert.equal(result.success, false);
-  const feedbackIssue = result.error.issues.find((i) => i.path.includes("feedback"));
+  const feedbackIssue = result.error.issues.find((i) =>
+    i.path.includes("feedback"),
+  );
   assert.ok(feedbackIssue, "error should be attributed to the feedback field");
 });
 
 check("5c. Review decision 'rejected' with empty-string feedback fails", () => {
-  const result = reviewKnowledgeSchema.safeParse({ decision: "rejected", feedback: "" });
+  const result = reviewKnowledgeSchema.safeParse({
+    decision: "rejected",
+    feedback: "",
+  });
   assert.equal(result.success, false);
 });
 
-check("5d. Review decision 'rejected' with whitespace-only feedback fails", () => {
-  // trim() happens inside the schema's own .trim() call on the field
-  // before the superRefine check runs, so whitespace-only input is
-  // reduced to an empty string by the time the conditional check sees it.
-  const result = reviewKnowledgeSchema.safeParse({ decision: "rejected", feedback: "   " });
-  assert.equal(result.success, false);
-});
+check(
+  "5d. Review decision 'rejected' with whitespace-only feedback fails",
+  () => {
+    // trim() happens inside the schema's own .trim() call on the field
+    // before the superRefine check runs, so whitespace-only input is
+    // reduced to an empty string by the time the conditional check sees it.
+    const result = reviewKnowledgeSchema.safeParse({
+      decision: "rejected",
+      feedback: "   ",
+    });
+    assert.equal(result.success, false);
+  },
+);
 
 // ---------------------------------------------------------------------
 // 6. Comment ISSUE / WIKI
@@ -240,17 +269,20 @@ check("6b. Comment with refType 'WIKI' passes", () => {
   assert.equal(result.success, true);
 });
 
-check("6c. Comment with an unrecognized refType fails (e.g. 'KNOWLEDGE')", () => {
-  // Confirms the discriminator stays "WIKI" per the locked terminology —
-  // "KNOWLEDGE" is NOT a valid refType even though the collection is
-  // named Knowledge (see comment.validation.js / persistence-design.md §3).
-  const result = createCommentSchema.safeParse({
-    refType: "KNOWLEDGE",
-    refId: VALID_OID,
-    body: "test",
-  });
-  assert.equal(result.success, false);
-});
+check(
+  "6c. Comment with an unrecognized refType fails (e.g. 'KNOWLEDGE')",
+  () => {
+    // Confirms the discriminator stays "WIKI" per the locked terminology —
+    // "KNOWLEDGE" is NOT a valid refType even though the collection is
+    // named Knowledge (see comment.validation.js / persistence-design.md §3).
+    const result = createCommentSchema.safeParse({
+      refType: "KNOWLEDGE",
+      refId: VALID_OID,
+      body: "test",
+    });
+    assert.equal(result.success, false);
+  },
+);
 
 check("6d. Comment with optional parentComment (valid ObjectId) passes", () => {
   const result = createCommentSchema.safeParse({
@@ -313,40 +345,61 @@ check("7c. Project payload missing originIssue fails", () => {
 // ---------------------------------------------------------------------
 // 8. Transition schema: accepts all known status values, enforces no legality
 // ---------------------------------------------------------------------
-const ALL_ISSUE_STATUSES = ["open", "acknowledged", "in_progress", "resolved", "verified"];
+const ALL_ISSUE_STATUSES = [
+  "open",
+  "acknowledged",
+  "in_progress",
+  "resolved",
+  "verified",
+];
 
 for (const status of ALL_ISSUE_STATUSES) {
-  check(`8. changeIssueStatusSchema accepts targetStatus="${status}" (shape only, not legality)`, () => {
-    const result = changeIssueStatusSchema.safeParse({ targetStatus: status });
-    assert.equal(result.success, true);
-  });
+  check(
+    `8. changeIssueStatusSchema accepts targetStatus="${status}" (shape only, not legality)`,
+    () => {
+      const result = changeIssueStatusSchema.safeParse({
+        targetStatus: status,
+      });
+      assert.equal(result.success, true);
+    },
+  );
 }
 
-check("8f. changeIssueStatusSchema rejects an unrecognized status string", () => {
-  const result = changeIssueStatusSchema.safeParse({ targetStatus: "closed" });
-  assert.equal(result.success, false);
-});
+check(
+  "8f. changeIssueStatusSchema rejects an unrecognized status string",
+  () => {
+    const result = changeIssueStatusSchema.safeParse({
+      targetStatus: "closed",
+    });
+    assert.equal(result.success, false);
+  },
+);
 
-check("8g. changeIssueStatusSchema accepting 'open' as a target is deliberate, not an oversight", () => {
-  // "open" can never legally be a transition TARGET under ADR-0003's
-  // graph (it's a source-only state). This schema does NOT know that —
-  // and is not supposed to. Transition legality is the service layer's
-  // job (changeStatus()), not Zod's. This check exists so that fact
-  // stays documented and testable, not just asserted in a comment.
-  const result = changeIssueStatusSchema.safeParse({ targetStatus: "open" });
-  assert.equal(
-    result.success,
-    true,
-    "schema should accept 'open' as shape-valid even though it's never a legal transition target"
-  );
-});
+check(
+  "8g. changeIssueStatusSchema accepting 'open' as a target is deliberate, not an oversight",
+  () => {
+    // "open" can never legally be a transition TARGET under ADR-0003's
+    // graph (it's a source-only state). This schema does NOT know that —
+    // and is not supposed to. Transition legality is the service layer's
+    // job (changeStatus()), not Zod's. This check exists so that fact
+    // stays documented and testable, not just asserted in a comment.
+    const result = changeIssueStatusSchema.safeParse({ targetStatus: "open" });
+    assert.equal(
+      result.success,
+      true,
+      "schema should accept 'open' as shape-valid even though it's never a legal transition target",
+    );
+  },
+);
 
 // ---------------------------------------------------------------------
 // Report
 // ---------------------------------------------------------------------
 console.log("\nPhase C validation-layer verification\n" + "=".repeat(40));
 for (const r of results) {
-  console.log(`${r.ok ? "✔" : "✘"} ${r.label}${r.ok ? "" : `\n    ${r.error}`}`);
+  console.log(
+    `${r.ok ? "✔" : "✘"} ${r.label}${r.ok ? "" : `\n    ${r.error}`}`,
+  );
 }
 console.log("=".repeat(40));
 console.log(`${results.length - failures}/${results.length} checks passed`);

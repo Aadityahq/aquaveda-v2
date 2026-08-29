@@ -9,16 +9,16 @@ this register is not a record of a fully closed milestone.
 ## 🔒 Locked (see ADR-0003, ADR-0004, `domain-model.md`)
 
 - Issue lifecycle: 5-state graph, transition authority, `resolverId !==
-  verifierId`, EXPERT-only verification, `acknowledged` mandatory,
+verifierId`, EXPERT-only verification, `acknowledged` mandatory,
   failed-verification routes to `in_progress` only, `verified` terminal
   for V2.
 - Knowledge lifecycle: `draft → pending_review → approved | rejected →
-  draft`, EXPERT-only review authority, `reviewerId !== authorId`,
+draft`, EXPERT-only review authority, `reviewerId !== authorId`,
   mandatory rejection feedback, content locked during `pending_review`, no
   re-review of approved content in V2.
 - Issue ↔ Project: `Issue 0..* Project`, immutable required origin
   reference, creation gated to Issue status ∈ `{acknowledged, in_progress,
-  resolved, verified}`, independent ownership, independent lifecycles, no
+resolved, verified}`, independent ownership, independent lifecycles, no
   automatic Issue authority from Project membership.
 - Recommendation: derived service output, no persistence, no
   ownership/lifecycle/authority, Invariant 7 as a service-boundary
@@ -30,16 +30,16 @@ this register is not a record of a fully closed milestone.
 
 ## ⏸️ Deferred
 
-| Item | Note |
-|---|---|
-| User suspension/deactivation | No current requirement; adding a status field now would be speculative |
-| Expert role acquisition mechanism | Belongs to the Authentication/Governance milestone — `role: EXPERT` as a fact is established, the assignment *process* is not |
-| Comment deletion (soft/hard) | No v1 precedent, no current requirement |
-| Project status field | Explicitly decided against for V2; revisit only if the Act milestone proves a need |
-| Leaving a project | No v1 precedent, no current requirement |
-| Admin governance of already-approved Knowledge | Real future need, not solved by extending approval authority now |
-| Re-review of approved Knowledge | Out of scope for V2 |
-| Issue recurrence / reopening `verified` | Parked; a future `relatedIssue` reference is the likely shape, not un-terminaling `verified` |
+| Item                                           | Note                                                                                                                          |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| User suspension/deactivation                   | No current requirement; adding a status field now would be speculative                                                        |
+| Expert role acquisition mechanism              | Belongs to the Authentication/Governance milestone — `role: EXPERT` as a fact is established, the assignment _process_ is not |
+| Comment deletion (soft/hard)                   | No v1 precedent, no current requirement                                                                                       |
+| Project status field                           | Explicitly decided against for V2; revisit only if the Act milestone proves a need                                            |
+| Leaving a project                              | No v1 precedent, no current requirement                                                                                       |
+| Admin governance of already-approved Knowledge | Real future need, not solved by extending approval authority now                                                              |
+| Re-review of approved Knowledge                | Out of scope for V2                                                                                                           |
+| Issue recurrence / reopening `verified`        | Parked; a future `relatedIssue` reference is the likely shape, not un-terminaling `verified`                                  |
 
 ## 🔧 Implementation detail (resolved when the relevant schema is written, no ADR needed)
 

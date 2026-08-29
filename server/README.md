@@ -20,6 +20,7 @@ specification, not as code to port.
 ## What arrives at each milestone
 
 ### Domain Model milestone
+
 - `src/config/db.js` — Mongoose connection singleton with graceful shutdown
 - `src/models/` — User, Issue, Knowledge, Comment, Project schemas
   - Corrects v1 bugs: `password select:false` always present, consistent
@@ -29,25 +30,31 @@ specification, not as code to port.
   Next.js dev and production origins
 
 ### Authentication milestone
+
 - `src/modules/auth/` — register, login, logout, refresh token, me
 - `src/modules/users/`
 - JWT via `jsonwebtoken`, access + refresh token pair
 - Zod validation on all auth routes
 
 ### Explore milestone
+
 - `src/modules/issues/` — full CRUD, geo queries, status lifecycle
 - `src/modules/ai/` — rule-based recommendation engine
 
 ### Learn milestone
+
 - `src/modules/wiki/` — moderation lifecycle
 
 ### Act milestone
+
 - `src/modules/projects/`
 
 ### Community milestone
+
 - `src/modules/comments/` — Issue + Knowledge ref types
 
 ### Dashboard milestone
+
 - `src/modules/dashboard/`
 
 ## Environment variables

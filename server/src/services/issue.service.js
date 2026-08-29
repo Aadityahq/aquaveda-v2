@@ -131,7 +131,7 @@ function authorizeTransition(fromStatus, targetStatus, actorContext, issueDoc) {
     // user," a REMEDIATOR role, or Project-membership authority.
     throw authorizationPolicyUnresolved(
       "authorization for acknowledged -> in_progress is not yet defined (D-3a)",
-      { transition: "acknowledged->in_progress" }
+      { transition: "acknowledged->in_progress" },
     );
   }
 
@@ -139,7 +139,7 @@ function authorizeTransition(fromStatus, targetStatus, actorContext, issueDoc) {
     // Same D-3a gate.
     throw authorizationPolicyUnresolved(
       "authorization for in_progress -> resolved is not yet defined (D-3a)",
-      { transition: "in_progress->resolved" }
+      { transition: "in_progress->resolved" },
     );
   }
 
@@ -160,13 +160,13 @@ function authorizeTransition(fromStatus, targetStatus, actorContext, issueDoc) {
       // worth checking rather than trusting silently.
       throw invalidState(
         "expected the most recent history entry to record the resolved transition",
-        { statusHistory: issueDoc.statusHistory }
+        { statusHistory: issueDoc.statusHistory },
       );
     }
     if (String(lastEntry.actor) === String(actorContext.id)) {
       throw forbidden(
         "the actor who resolved an Issue may not also verify it",
-        { transition: "resolved->verified" }
+        { transition: "resolved->verified" },
       );
     }
     return;
@@ -176,7 +176,7 @@ function authorizeTransition(fromStatus, targetStatus, actorContext, issueDoc) {
     // Failed verification. EXPERT-authorized, per ADR-0003.
     if (actorContext.role !== "EXPERT") {
       throw forbidden(
-        "only an EXPERT may record a failed verification (resolved -> in_progress)"
+        "only an EXPERT may record a failed verification (resolved -> in_progress)",
       );
     }
     return;
@@ -185,7 +185,9 @@ function authorizeTransition(fromStatus, targetStatus, actorContext, issueDoc) {
   // Should be unreachable — transition legality is checked before this
   // function is called. If reached, it means LEGAL_TRANSITIONS and this
   // function have drifted out of sync with each other.
-  throw invalidState(`no authorization rule defined for ${fromStatus} -> ${targetStatus}`);
+  throw invalidState(
+    `no authorization rule defined for ${fromStatus} -> ${targetStatus}`,
+  );
 }
 
 /**
@@ -227,7 +229,7 @@ export async function changeStatus(actorContext, issueId, targetStatus) {
   if (!legalTargets.includes(targetStatus)) {
     throw invalidState(
       `illegal transition: ${expectedStatus} -> ${targetStatus}`,
-      { from: expectedStatus, to: targetStatus }
+      { from: expectedStatus, to: targetStatus },
     );
   }
 
@@ -251,7 +253,7 @@ export async function changeStatus(actorContext, issueId, targetStatus) {
         },
       },
     },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   if (updated) {
@@ -265,10 +267,12 @@ export async function changeStatus(actorContext, issueId, targetStatus) {
   // this distinction explicitly.
   const stillExists = await Issue.exists({ _id: issueId });
   if (!stillExists) {
-    throw notFound(`Issue ${issueId} was deleted before the transition completed`);
+    throw notFound(
+      `Issue ${issueId} was deleted before the transition completed`,
+    );
   }
   throw stateRace(
     `Issue ${issueId} status changed before this transition could be applied`,
-    { expectedStatus, targetStatus }
+    { expectedStatus, targetStatus },
   );
 }

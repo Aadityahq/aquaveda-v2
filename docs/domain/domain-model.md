@@ -8,11 +8,13 @@ Each primitive lists the milestone that first builds it.
 
 ---
 
-## User — *Authentication milestone*
+## User — _Authentication milestone_
+
 Identity and role. Roles: `USER`, `EXPERT`, `ADMIN`.
 Every contribution traces to an account (Product Law 1).
 
-## Issue — *Explore milestone*
+## Issue — _Explore milestone_
+
 A geo-tagged, reported problem. Always has a location (Product Law 2).
 Independently real whether or not a Project exists around it. Carries a
 `domain` field defaulting to `"water"` — the schema doesn't assume water is
@@ -43,7 +45,8 @@ mechanism for obtaining that authority is deferred to the Project/Act
 authorization design — see D-3a in the domain decision register. Project
 creator/contributor status does **not** by itself grant this authority.
 
-## Knowledge — *Learn milestone*
+## Knowledge — _Learn milestone_
+
 A moderated article. Draft until expert-approved, then public.
 Author-owned while pending. Full rationale in ADR-0004.
 
@@ -66,12 +69,14 @@ imply competence to judge Knowledge quality and accuracy, per Invariant 9.
 Hard invariant: `reviewerId !== authorId`, regardless of role — an author
 can never approve their own submission.
 
-## Comment — *shared primitive, first built at Explore, reused at Learn*
+## Comment — _shared primitive, first built at Explore, reused at Learn_
+
 Attached to either an Issue or a Knowledge article via a `refType`
 discriminator. Built once, mounted in two places. "Community" is a view
 over this primitive, not where it's implemented.
 
-## Project — *Act milestone*
+## Project — _Act milestone_
+
 Created from an Issue, never standalone. Has contributors and
 creator-controlled progress tracking. No status/lifecycle field in V2 —
 existence, contributors, and progress are sufficient for now.
@@ -93,7 +98,8 @@ Project ownership (`creator`) is fully independent from Issue ownership
 contributor status does not, by itself, grant any Issue lifecycle
 authority (see the Issue section above and D-3a).
 
-## Recommendation — *AI milestone*
+## Recommendation — _AI milestone_
+
 A **derived service output, not a persisted entity.** Computed on request
 from the rule engine (and later, optionally, an LLM layer) against an
 Issue — no `Recommendation` collection, no ownership, no lifecycle, no
@@ -110,7 +116,7 @@ conflict-detection requirement: approved Knowledge is authoritative within
 the domain; Recommendation is assistive and carries no capability to
 alter, invalidate, downgrade, or supersede an approved Knowledge record.
 The rule engine has no obligation to compare its output against Knowledge
-content — the contract is about what Recommendation *can never do*
+content — the contract is about what Recommendation _can never do_
 (nothing writes to Knowledge from this path), not about detecting
 disagreement.
 

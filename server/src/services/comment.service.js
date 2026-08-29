@@ -66,7 +66,7 @@ export async function createComment(actorContext, payload) {
   if (!SUPPORTED_REF_TYPES.includes(payload.refType)) {
     throw invalidState(
       `"${payload.refType}" is not a supported Comment refType`,
-      { refType: payload.refType }
+      { refType: payload.refType },
     );
   }
 
@@ -74,7 +74,7 @@ export async function createComment(actorContext, payload) {
   if (!exists) {
     throw targetNotFound(
       `no ${payload.refType} document found for refId ${payload.refId}`,
-      { refType: payload.refType, refId: payload.refId }
+      { refType: payload.refType, refId: payload.refId },
     );
   }
 
@@ -89,7 +89,9 @@ export async function createComment(actorContext, payload) {
       throw wrapMongooseValidationError(err);
     }
     if (!parent) {
-      throw invalidParent(`parentComment ${payload.parentComment} does not exist`);
+      throw invalidParent(
+        `parentComment ${payload.parentComment} does not exist`,
+      );
     }
 
     if (parent.parentComment) {
@@ -110,7 +112,7 @@ export async function createComment(actorContext, payload) {
         {
           parent: { refType: parent.refType, refId: parent.refId },
           reply: { refType: payload.refType, refId: payload.refId },
-        }
+        },
       );
     }
   }

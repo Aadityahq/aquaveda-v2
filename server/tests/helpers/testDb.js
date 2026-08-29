@@ -35,7 +35,7 @@ export async function setupTestDb() {
   ) {
     throw new Error(
       "TEST_MONGO_URI must not be the same as MONGO_URI — refusing to " +
-        "run tests against the development database."
+        "run tests against the development database.",
     );
   }
 

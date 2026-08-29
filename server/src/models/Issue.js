@@ -71,7 +71,7 @@ const issueStatusHistoryEntrySchema = new Schema(
       default: Date.now,
     },
   },
-  { _id: true } // default Mongoose behavior kept; each entry gets a stable id
+  { _id: true }, // default Mongoose behavior kept; each entry gets a stable id
 );
 
 /**
@@ -125,7 +125,7 @@ const locationSchema = new Schema(
       },
     },
   },
-  { _id: false }
+  { _id: false },
 );
 // Geographic range validation (longitude in [-180, 180], latitude in
 // [-90, 90]) is deliberately NOT enforced here — that belongs at the
@@ -184,7 +184,7 @@ const issueSchema = new Schema(
       // document is being created.
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Approved indexes only (persistence-design.md §6 / ADR-0005):

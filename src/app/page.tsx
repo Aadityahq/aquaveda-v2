@@ -14,8 +14,9 @@ export default function HomePage() {
           AquaVeda is being rebuilt from first principles.
         </h1>
         <p className="text-muted-foreground text-base leading-relaxed text-pretty">
-          This is a reconstruction, not a port. The app shell, design system, and
-          data loop on this page are what every later module gets built on top of.
+          This is a reconstruction, not a port. The app shell, design system,
+          and data loop on this page are what every later module gets built on
+          top of.
         </p>
       </div>
 

@@ -16,7 +16,7 @@ lives in.
 - **Small, focused files.** A component earns its own file once it has its
   own reason to change. Composition over inheritance.
 - **No prop drilling past two levels.** Colocate state or use context.
-- **Comments explain *why*, not *what*.** The code says what it does.
+- **Comments explain _why_, not _what_.** The code says what it does.
   A comment earns its place by carrying reasoning the code cannot.
 - **No `console.log` in committed code.** `console.error` is acceptable in
   error boundaries and genuinely exceptional paths.

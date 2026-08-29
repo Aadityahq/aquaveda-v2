@@ -1,6 +1,7 @@
 # ADR-0006: Conditional state-conditioned atomic lifecycle transitions
 
 ## Status
+
 Accepted.
 
 ## Context
@@ -9,7 +10,7 @@ ADR-0005 establishes that Issue status and its history are stored in the
 same document, and that Knowledge status and its review history are stored
 in the same document. MongoDB's single-document write atomicity guarantees
 that any write to one of these documents is all-or-nothing. This covers
-the *persistence* side of lifecycle transitions.
+the _persistence_ side of lifecycle transitions.
 
 It does not cover a separate, distinct problem: the **read-validate-write
 race**.
@@ -32,7 +33,7 @@ the second write proceeding against a document whose state has already
 changed.
 
 MongoDB's document-level atomicity guarantees that each individual write
-at step 4 is atomic. It does not guarantee that the *state read at step 1*
+at step 4 is atomic. It does not guarantee that the _state read at step 1_
 is still the document's state at the moment step 4 executes. Those are
 different guarantees, and conflating them would be a real correctness
 failure in the lifecycle implementation.
@@ -114,11 +115,11 @@ ADR; this ADR's scope is the architectural requirement that the
 distinction exist and be preserved through the service layer, not the
 wire format:
 
-| Failure mode | Meaning | How detected |
-|---|---|---|
-| Invalid transition | The requested `targetStatus` is not a legal next state from the current state (per ADR-0003/ADR-0004 transition graphs) | Checked at step 2, before the write |
-| Unauthorized actor | The actor does not hold authority for this transition | Checked at step 3, before the write |
-| State race | The document's state changed between step 1 and step 4 | Detected by zero-document match from the conditional update at step 4 |
+| Failure mode       | Meaning                                                                                                                 | How detected                                                          |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Invalid transition | The requested `targetStatus` is not a legal next state from the current state (per ADR-0003/ADR-0004 transition graphs) | Checked at step 2, before the write                                   |
+| Unauthorized actor | The actor does not hold authority for this transition                                                                   | Checked at step 3, before the write                                   |
+| State race         | The document's state changed between step 1 and step 4                                                                  | Detected by zero-document match from the conditional update at step 4 |
 
 A state-race failure is not an authorization failure and must not be
 reported as one. Conflating them would cause callers to incorrectly

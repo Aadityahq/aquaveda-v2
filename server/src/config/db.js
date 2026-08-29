@@ -34,7 +34,7 @@ function getRequiredEnv(name) {
   if (!value) {
     throw new Error(
       `Missing required environment variable: ${name}. ` +
-        "See server/README.md for the expected environment variables."
+        "See server/README.md for the expected environment variables.",
     );
   }
   return value;

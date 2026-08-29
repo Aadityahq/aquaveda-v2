@@ -5,11 +5,11 @@ not enough process to become a second job.
 
 ## Tools (not yet installed — added at the milestone that needs them)
 
-| Layer | Tool | Added at |
-|---|---|---|
-| Unit / logic | Vitest | Domain Model milestone |
-| Component | React Testing Library | Auth milestone |
-| End-to-end | Playwright | After first real user flow exists |
+| Layer        | Tool                  | Added at                          |
+| ------------ | --------------------- | --------------------------------- |
+| Unit / logic | Vitest                | Domain Model milestone            |
+| Component    | React Testing Library | Auth milestone                    |
+| End-to-end   | Playwright            | After first real user flow exists |
 
 ## What gets tested at each level
 

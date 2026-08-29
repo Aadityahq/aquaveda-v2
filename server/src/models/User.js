@@ -73,7 +73,7 @@ const userSchema = new Schema(
         return ret;
       },
     },
-  }
+  },
 );
 
 // Approved index: unique email (uniqueness comes from `unique: true` above;

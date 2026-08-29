@@ -2,9 +2,21 @@ import { describe, it, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
 import { Knowledge } from "../src/models/Knowledge.js";
-import { createKnowledge, submitForReview, approve, reject, revise } from "../src/services/knowledge.service.js";
+import {
+  createKnowledge,
+  submitForReview,
+  approve,
+  reject,
+  revise,
+} from "../src/services/knowledge.service.js";
 import { DomainErrorCode } from "../src/services/errors.js";
-import { setupTestDb, teardownTestDb, clearCollections, fakeActor, fakeObjectId } from "./helpers/testDb.js";
+import {
+  setupTestDb,
+  teardownTestDb,
+  clearCollections,
+  fakeActor,
+  fakeObjectId,
+} from "./helpers/testDb.js";
 
 before(setupTestDb);
 after(teardownTestDb);
@@ -63,7 +75,7 @@ describe("knowledge.service — submitForReview", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.FORBIDDEN);
         return true;
-      }
+      },
     );
   });
 
@@ -74,7 +86,7 @@ describe("knowledge.service — submitForReview", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.INVALID_STATE);
         return true;
-      }
+      },
     );
   });
 });
@@ -98,7 +110,7 @@ describe("knowledge.service — approve", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.FORBIDDEN);
         return true;
-      }
+      },
     );
   });
 
@@ -110,7 +122,7 @@ describe("knowledge.service — approve", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.FORBIDDEN);
         return true;
-      }
+      },
     );
   });
 
@@ -121,7 +133,7 @@ describe("knowledge.service — approve", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.INVALID_STATE);
         return true;
-      }
+      },
     );
   });
 });
@@ -145,13 +157,15 @@ describe("knowledge.service — reject", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.INVALID_STATE);
         return true;
-      }
+      },
     );
   });
 
   it("rejecting with whitespace-only feedback fails", async () => {
     const { knowledge } = await makePendingReview();
-    await assert.rejects(() => reject(fakeActor("EXPERT"), knowledge._id, "   "));
+    await assert.rejects(() =>
+      reject(fakeActor("EXPERT"), knowledge._id, "   "),
+    );
   });
 
   it("a non-EXPERT cannot reject", async () => {
@@ -161,7 +175,7 @@ describe("knowledge.service — reject", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.FORBIDDEN);
         return true;
-      }
+      },
     );
   });
 });
@@ -169,13 +183,20 @@ describe("knowledge.service — reject", () => {
 describe("knowledge.service — revise", () => {
   async function makeRejected(author = fakeActor("USER")) {
     const { knowledge } = await makePendingReview(author);
-    const rejected = await reject(fakeActor("EXPERT"), knowledge._id, "please improve sourcing");
+    const rejected = await reject(
+      fakeActor("EXPERT"),
+      knowledge._id,
+      "please improve sourcing",
+    );
     return { knowledge: rejected, author };
   }
 
   it("author can revise a rejected article; status returns to draft", async () => {
     const { knowledge, author } = await makeRejected();
-    const revised = await revise(author, knowledge._id, { title: "Better title", body: "Improved body" });
+    const revised = await revise(author, knowledge._id, {
+      title: "Better title",
+      body: "Improved body",
+    });
     assert.equal(revised.status, "draft");
     assert.equal(revised.title, "Better title");
     assert.equal(revised.body, "Improved body");
@@ -194,7 +215,7 @@ describe("knowledge.service — revise", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.FORBIDDEN);
         return true;
-      }
+      },
     );
   });
 
@@ -205,14 +226,17 @@ describe("knowledge.service — revise", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.INVALID_STATE);
         return true;
-      }
+      },
     );
   });
 
   it("revise cannot change author, even if the caller supplies one", async () => {
     const { knowledge, author } = await makeRejected();
     const intruder = fakeObjectId();
-    const revised = await revise(author, knowledge._id, { title: "t", author: intruder });
+    const revised = await revise(author, knowledge._id, {
+      title: "t",
+      author: intruder,
+    });
     assert.equal(String(revised.author), author.id);
   });
 });

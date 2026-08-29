@@ -12,6 +12,7 @@ Extensibility is an architectural property, not a feature roadmap item.
 
 The legacy repository is evidence of what works, not authority on how
 to build it. For every piece under consideration:
+
 1. Should this exist at all?
 2. Is this still the best UX?
 3. Can the architecture be simpler?

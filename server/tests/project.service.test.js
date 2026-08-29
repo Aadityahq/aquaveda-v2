@@ -5,7 +5,14 @@ import { Issue } from "../src/models/Issue.js";
 import { createIssue } from "../src/services/issue.service.js";
 import { createProject } from "../src/services/project.service.js";
 import { DomainErrorCode } from "../src/services/errors.js";
-import { setupTestDb, teardownTestDb, clearCollections, fakeActor, fakeObjectId, validPoint } from "./helpers/testDb.js";
+import {
+  setupTestDb,
+  teardownTestDb,
+  clearCollections,
+  fakeActor,
+  fakeObjectId,
+  validPoint,
+} from "./helpers/testDb.js";
 
 before(setupTestDb);
 after(teardownTestDb);
@@ -21,7 +28,13 @@ beforeEach(clearCollections);
  * generic abstraction — local to this file, fixed known status order,
  * no support for arbitrary graphs.
  */
-const ISSUE_STATUS_CHAIN = ["open", "acknowledged", "in_progress", "resolved", "verified"];
+const ISSUE_STATUS_CHAIN = [
+  "open",
+  "acknowledged",
+  "in_progress",
+  "resolved",
+  "verified",
+];
 
 async function makeIssueWithStatus(status) {
   const issue = await createIssue(fakeActor("USER"), {
@@ -33,7 +46,9 @@ async function makeIssueWithStatus(status) {
   if (status !== "open") {
     const targetIndex = ISSUE_STATUS_CHAIN.indexOf(status);
     if (targetIndex === -1) {
-      throw new Error(`makeIssueWithStatus: "${status}" is not a known Issue status`);
+      throw new Error(
+        `makeIssueWithStatus: "${status}" is not a known Issue status`,
+      );
     }
 
     const entries = [];
@@ -53,14 +68,19 @@ async function makeIssueWithStatus(status) {
         $push: {
           statusHistory: { $each: entries },
         },
-      }
+      },
     );
   }
   return Issue.findById(issue._id);
 }
 
 describe("project.service — createProject", () => {
-  for (const status of ["acknowledged", "in_progress", "resolved", "verified"]) {
+  for (const status of [
+    "acknowledged",
+    "in_progress",
+    "resolved",
+    "verified",
+  ]) {
     it(`allows creation when the Issue is "${status}"`, async () => {
       const issue = await makeIssueWithStatus(status);
       const creator = fakeActor("USER");
@@ -87,7 +107,7 @@ describe("project.service — createProject", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.INVALID_STATE);
         return true;
-      }
+      },
     );
   });
 
@@ -102,7 +122,7 @@ describe("project.service — createProject", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.NOT_FOUND);
         return true;
-      }
+      },
     );
   });
 
@@ -135,9 +155,17 @@ describe("project.service — createProject", () => {
       originIssue: issue._id,
     });
     const fields = Object.keys(project.toObject()).sort();
-    const disallowed = ["remediationAuthority", "issueAuthority", "canResolve", "canVerify"];
+    const disallowed = [
+      "remediationAuthority",
+      "issueAuthority",
+      "canResolve",
+      "canVerify",
+    ];
     for (const field of disallowed) {
-      assert.ok(!fields.includes(field), `Project should never have a "${field}" field`);
+      assert.ok(
+        !fields.includes(field),
+        `Project should never have a "${field}" field`,
+      );
     }
   });
 });

@@ -30,7 +30,10 @@ export function FoundationStatusCard({ initial }: { initial: SystemSnapshot }) {
           <CardDescription>Foundation slice status readout</CardDescription>
         </div>
         <Badge variant="verified">
-          <span aria-hidden="true" className="bg-current size-1.5 rounded-full opacity-70" />
+          <span
+            aria-hidden="true"
+            className="bg-current size-1.5 rounded-full opacity-70"
+          />
           {snapshot.status}
         </Badge>
       </CardHeader>
@@ -41,7 +44,9 @@ export function FoundationStatusCard({ initial }: { initial: SystemSnapshot }) {
           <dt className="text-muted-foreground">Runtime</dt>
           <dd className="text-right">{snapshot.runtime}</dd>
           <dt className="text-muted-foreground">Checked at</dt>
-          <dd className="text-right">{new Date(snapshot.timestamp).toLocaleTimeString()}</dd>
+          <dd className="text-right">
+            {new Date(snapshot.timestamp).toLocaleTimeString()}
+          </dd>
         </dl>
         <div className="flex justify-end">
           <FoundationRefreshButton onRefreshed={setSnapshot} />

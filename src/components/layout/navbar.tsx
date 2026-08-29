@@ -26,7 +26,6 @@ export function Navbar() {
   return (
     <header className="border-border/80 bg-background/95 sticky top-0 z-40 border-b backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-
         {/* Logo */}
         <Link
           href="/"
@@ -57,7 +56,6 @@ export function Navbar() {
           <ThemeToggle />
           <MobileNav />
         </div>
-
       </div>
       <div className="contour-rule" aria-hidden="true" />
     </header>

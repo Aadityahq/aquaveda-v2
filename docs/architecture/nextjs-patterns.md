@@ -7,6 +7,7 @@ needs browser APIs, React state, or event handlers. Then push that boundary
 as deep in the tree as possible, not at the page level.
 
 **Reference pattern — the Foundation Slice status card:**
+
 - `page.tsx` (Server Component): calls `getSystemSnapshot()` directly —
   no fetch, no useEffect, no loading state. Runs on the server.
 - `FoundationStatusCard` (Client Component): owns the interactive refresh,
@@ -49,6 +50,7 @@ src/
 A typed fetch wrapper lives in `lib/api-client.ts`. Every request to the
 Express backend goes through it — never a raw `fetch` with a string URL
 scattered across components. It handles:
+
 - Base URL from environment variable
 - Authorization header injection
 - Response envelope unwrapping (`{ success, data, message }`)

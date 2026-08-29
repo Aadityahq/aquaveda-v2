@@ -70,7 +70,7 @@ const projectSchema = new Schema(
       default: "",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Approved indexes only (persistence-design.md §6 / ADR-0005):

@@ -39,7 +39,12 @@ export function FoundationRefreshButton({
 
   return (
     <div className="flex flex-col items-end gap-1.5">
-      <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isPending}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleRefresh}
+        disabled={isPending}
+      >
         {isPending ? "Checking..." : "Refresh"}
       </Button>
       {error && (

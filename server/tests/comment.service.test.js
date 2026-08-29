@@ -5,7 +5,14 @@ import { createIssue } from "../src/services/issue.service.js";
 import { createKnowledge } from "../src/services/knowledge.service.js";
 import { createComment } from "../src/services/comment.service.js";
 import { DomainErrorCode } from "../src/services/errors.js";
-import { setupTestDb, teardownTestDb, clearCollections, fakeActor, fakeObjectId, validPoint } from "./helpers/testDb.js";
+import {
+  setupTestDb,
+  teardownTestDb,
+  clearCollections,
+  fakeActor,
+  fakeObjectId,
+  validPoint,
+} from "./helpers/testDb.js";
 
 before(setupTestDb);
 after(teardownTestDb);
@@ -59,7 +66,7 @@ describe("comment.service — createComment", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.TARGET_NOT_FOUND);
         return true;
-      }
+      },
     );
   });
 
@@ -104,7 +111,7 @@ describe("comment.service — createComment", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.INVALID_PARENT);
         return true;
-      }
+      },
     );
   });
 
@@ -128,7 +135,7 @@ describe("comment.service — createComment", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.INVALID_PARENT);
         return true;
-      }
+      },
     );
   });
 
@@ -152,7 +159,7 @@ describe("comment.service — createComment", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.INVALID_PARENT);
         return true;
-      }
+      },
     );
   });
 
@@ -184,7 +191,7 @@ describe("comment.service — createComment", () => {
       (err) => {
         assert.equal(err.code, DomainErrorCode.INVALID_STATE);
         return true;
-      }
+      },
     );
   });
 });

@@ -1,6 +1,7 @@
 # ADR-0004: Knowledge moderation lifecycle
 
 ## Status
+
 Accepted.
 
 ## Context
@@ -22,12 +23,12 @@ therefore carries more product weight than a typical CRUD approval flow.
 
 ### State semantics
 
-| State | Meaning |
-|---|---|
-| `draft` | Author is composing or editing. Not visible to anyone but the author. |
-| `pending_review` | Submitted for review. Content is locked — the author cannot edit while a decision is pending. |
-| `approved` | An authorized Expert has reviewed the submitted content and judged it suitable for public publication under the platform's *current* quality and accuracy standards. Not a claim of permanent or universal truth. |
-| `rejected` | An authorized Expert has determined this specific submission does not meet that bar. A statement about the submission, not a permanent judgment on the author or the topic. |
+| State            | Meaning                                                                                                                                                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draft`          | Author is composing or editing. Not visible to anyone but the author.                                                                                                                                             |
+| `pending_review` | Submitted for review. Content is locked — the author cannot edit while a decision is pending.                                                                                                                     |
+| `approved`       | An authorized Expert has reviewed the submitted content and judged it suitable for public publication under the platform's _current_ quality and accuracy standards. Not a claim of permanent or universal truth. |
+| `rejected`       | An authorized Expert has determined this specific submission does not meet that bar. A statement about the submission, not a permanent judgment on the author or the topic.                                       |
 
 ### Transition graph
 
@@ -130,7 +131,7 @@ record is not decided here.
 
 ## Consequences
 
-- Admin governance of an already-*approved* article that later surfaces a
+- Admin governance of an already-_approved_ article that later surfaces a
   policy problem is a real future need but is explicitly not solved here —
   it's a separate, deferred moderation-lifecycle concept, not a reason to
   grant ADMIN quality-approval authority now. Parked in

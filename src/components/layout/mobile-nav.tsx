@@ -86,7 +86,11 @@ export function MobileNav() {
               AquaVeda
             </Link>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close navigation menu">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Close navigation menu"
+              >
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>

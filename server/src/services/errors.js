@@ -77,4 +77,8 @@ export const stateRace = (message, details) =>
  * check, which is exactly what this project has been careful not to do.
  */
 export const authorizationPolicyUnresolved = (message, details) =>
-  new DomainError(DomainErrorCode.AUTHORIZATION_POLICY_UNRESOLVED, message, details);
+  new DomainError(
+    DomainErrorCode.AUTHORIZATION_POLICY_UNRESOLVED,
+    message,
+    details,
+  );

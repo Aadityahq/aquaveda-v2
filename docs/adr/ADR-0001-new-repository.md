@@ -1,6 +1,7 @@
 # ADR-0001: New repository — reconstruction over migration
 
 ## Status
+
 Accepted
 
 ## Context

@@ -69,7 +69,7 @@ const commentSchema = new Schema(
       default: null,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Approved index only:

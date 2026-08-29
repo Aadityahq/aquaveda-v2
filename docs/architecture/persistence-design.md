@@ -45,16 +45,16 @@ These govern every decision in this document:
 
 ## 2. Domain concept → persistence mapping
 
-| Concept | Persisted? | Shape | Why |
-|---|---|---|---|
-| User | Yes | Collection | Independent entity, queried independently (auth, listings, ownership joins), long-lived, referenced by every other entity. |
-| Issue | Yes | Collection | Independent entity with its own lifecycle, geo-queried independently (map, nearby, filters), referenced by Project/Comment. |
-| Knowledge | Yes | Collection | Independent entity with its own lifecycle, queried independently (public listing, author's drafts), referenced by Comment. |
-| Comment | Yes | Collection | Queried independently and paginated per-target; unbounded growth per Issue/Knowledge rules out embedding (this is the exact v1 bug — `Issue.comments[]` — already identified and rejected). |
-| Project | Yes | Collection | Independent entity, joined/listed independently, has its own contributor and progress data, referenced by nothing that would justify embedding it inside Issue (see §3). |
-| Recommendation | **No** | N/A — computed, not stored | Confirmed again here: no ownership, no lifecycle, no independent query need, no requirement surfaced anywhere in this analysis that changes the Domain Model conclusion. Remains a pure function output: `Issue → RecommendationService → { guidance, reasoning }`. |
-| Issue status history | Yes | **Embedded** array on Issue | See §4. |
-| Knowledge review history | Yes | **Embedded** array on Knowledge | See §5. |
+| Concept                  | Persisted? | Shape                           | Why                                                                                                                                                                                                                                                                 |
+| ------------------------ | ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User                     | Yes        | Collection                      | Independent entity, queried independently (auth, listings, ownership joins), long-lived, referenced by every other entity.                                                                                                                                          |
+| Issue                    | Yes        | Collection                      | Independent entity with its own lifecycle, geo-queried independently (map, nearby, filters), referenced by Project/Comment.                                                                                                                                         |
+| Knowledge                | Yes        | Collection                      | Independent entity with its own lifecycle, queried independently (public listing, author's drafts), referenced by Comment.                                                                                                                                          |
+| Comment                  | Yes        | Collection                      | Queried independently and paginated per-target; unbounded growth per Issue/Knowledge rules out embedding (this is the exact v1 bug — `Issue.comments[]` — already identified and rejected).                                                                         |
+| Project                  | Yes        | Collection                      | Independent entity, joined/listed independently, has its own contributor and progress data, referenced by nothing that would justify embedding it inside Issue (see §3).                                                                                            |
+| Recommendation           | **No**     | N/A — computed, not stored      | Confirmed again here: no ownership, no lifecycle, no independent query need, no requirement surfaced anywhere in this analysis that changes the Domain Model conclusion. Remains a pure function output: `Issue → RecommendationService → { guidance, reasoning }`. |
+| Issue status history     | Yes        | **Embedded** array on Issue     | See §4.                                                                                                                                                                                                                                                             |
+| Knowledge review history | Yes        | **Embedded** array on Knowledge | See §5.                                                                                                                                                                                                                                                             |
 
 Five collections. Issue status history and Knowledge review history are
 embedded within their parent documents, not separate collections (see §4,
@@ -112,7 +112,7 @@ documents. Referencing avoids duplicating/staleness-prone User data
 is embedded on `Project` (not a separate join collection) because the
 primary access pattern — "who has joined this Project" — reads it
 alongside the Project it belongs to. This does not mean contributors are
-*only* ever read that way: reverse lookups ("which Projects has this user
+_only_ ever read that way: reverse lookups ("which Projects has this user
 joined") are a plausible and reasonable query, answerable via an index on
 `contributors` without a separate join collection. If contributor counts
 grow materially large for a given Project, or write contention on the
@@ -121,9 +121,9 @@ representation should be reconsidered — most likely toward a separate
 `ProjectMembership` join collection at that point, not before.
 
 **What this array does and does not represent:** `contributors` records
-*Project participation* — who has joined a given collaborative effort.
-It does not represent, encode, or imply any form of *Issue lifecycle
-authority*. Project participation, Project progress-update authority
+_Project participation_ — who has joined a given collaborative effort.
+It does not represent, encode, or imply any form of _Issue lifecycle
+authority_. Project participation, Project progress-update authority
 (already scoped to `creator` only, per the Domain Model), and Issue
 status-transition authority are three distinct things, and this schema
 shape keeps them distinct rather than conflating them. In particular,
@@ -167,7 +167,7 @@ non-null `parentComment` of its own.
 
 **Domain relationship:** `author` is fixed at creation, immutable.
 `reviewer` is not a top-level property of a Knowledge article — it is a
-property of an individual review *decision*. A Knowledge article does not
+property of an individual review _decision_. A Knowledge article does not
 have "a reviewer" the way it has "an author"; it has zero or more review
 decisions, each made by a specific reviewer at a specific time. Framing
 it as a top-level property would imply that "the reviewer" is a durable
@@ -187,7 +187,7 @@ paragraph): both are properties of transitions, not of the entity.
 ### Issue reporter/resolver/verifier relationships
 
 **Domain relationship:** `reporter` is fixed at creation, immutable.
-Resolver and verifier are *not* fixed identities on the Issue as a
+Resolver and verifier are _not_ fixed identities on the Issue as a
 whole — they're properties of specific transitions, and because the
 lifecycle allows `resolved → in_progress → resolved → verified` loops
 (failed verification), a given Issue can accumulate multiple different
@@ -197,8 +197,8 @@ resolver/verifier pairs over its lifetime.
 immutable) at the top level. Resolver and verifier identity live
 **inside the status-history entries** (§4), not as flat
 `resolvedBy`/`verifiedBy` fields on Issue. This is a direct consequence of
-the failed-verification loop: a flat field would only ever hold the *most
-recent* actor and would silently lose the accountability trail ADR-0003
+the failed-verification loop: a flat field would only ever hold the _most
+recent_ actor and would silently lose the accountability trail ADR-0003
 requires the moment a verification fails and the cycle repeats. This
 connects §3 to §4 directly — the relationship analysis and the history
 analysis aren't independent conclusions, one requires the other.
@@ -243,7 +243,7 @@ by the domain as currently settled.
 Two options were weighed explicitly, not assumed:
 
 **Option A — keep `null → open`.** Define `statusHistory` formally as an
-Issue's *lifecycle history*: the first entry is a creation/initialization
+Issue's _lifecycle history_: the first entry is a creation/initialization
 event, and every entry after it is a state transition in the sense
 defined by ADR-0003. Under this definition, "creation" and "transition"
 are both members of one category — events in the lifecycle — so including
@@ -257,10 +257,10 @@ Issue creation at the top level, so the array never needs to speak for
 the creation moment at all.
 
 **Decision: Option A.** `statusHistory` includes the initial `null →
-open` entry, with `statusHistory` formally defined as: *the complete
+open` entry, with `statusHistory` formally defined as: _the complete
 lifecycle history of an Issue, whose first entry records creation and
 whose subsequent entries record each state transition, in the same
-representation.*
+representation._
 
 Reasoning: ADR-0003's accountability requirement is about reconstructing
 an Issue's full timeline — who made which claim, and when — and creation
@@ -283,7 +283,7 @@ duplication that introduces a synchronization problem.
 ### Concurrency: safe lifecycle transitions
 
 MongoDB's single-document write atomicity (relied on in §8 to rule out
-transactions) guarantees that *one* write to an Issue document is
+transactions) guarantees that _one_ write to an Issue document is
 all-or-nothing. It does **not**, by itself, guarantee that a
 **read-current-state, validate, then write** sequence — which is exactly
 what `changeStatus` does — is safe under concurrent execution. These are
@@ -302,14 +302,14 @@ two `in_progress → resolved` history entries for what should have been
 one accepted transition and one rejected race loser.
 
 **Required persistence-level invariant:** a status transition must
-validate against the *expected* current state and atomically update the
+validate against the _expected_ current state and atomically update the
 status and append its history entry as a single operation — not as a
 read, followed by a separate write that trusts the read was still valid.
 
 More precisely: **the `fromStatus` recorded in the appended history entry
 must equal the expected current status used in the conditional update's
 match filter.** These are not two independently-set values that happen to
-usually agree — they must be the *same* value, supplied once, used both
+usually agree — they must be the _same_ value, supplied once, used both
 to gate whether the write is allowed to happen at all and to populate what
 the write records as having happened. The conceptual operation is:
 
@@ -334,7 +334,7 @@ transitions to `targetStatus` while the history entry records a different
 — proposed for review):
 
 - **Conditional atomic update** (optimistic, state-conditioned): the
-  update operation's filter includes both the document id *and* the
+  update operation's filter includes both the document id _and_ the
   expected current status (e.g., "update this Issue, but only if its
   status is still `in_progress`"), with the status change and history-
   entry append performed in that same atomic operation. If the filter no
@@ -348,7 +348,7 @@ transitions to `targetStatus` while the history entry records a different
   version counter incremented on every write, checked-and-incremented
   atomically): a more general mechanism that works regardless of which
   field changed. Considered, but likely unnecessary complexity here
-  specifically *because* status is exactly the field under contention for
+  specifically _because_ status is exactly the field under contention for
   this class of race — conditioning the update on expected status
   achieves the same safety without a separate versioning scheme covering
   fields that aren't actually contested this way.
@@ -418,7 +418,7 @@ lands in the same place.
   established as a hard domain requirement in ADR-0004. Unlike Issue,
   this domain does require a content field on at least some entries.
 - **No synthetic creation event.** Unlike Issue's `statusHistory` (§4),
-  `reviewHistory` represents review *decisions* only — approve or reject
+  `reviewHistory` represents review _decisions_ only — approve or reject
   events. It does not contain an entry for the article entering `draft`
   or being submitted to `pending_review`; those aren't review decisions,
   and inventing a synthetic entry for them would misrepresent what the
@@ -427,7 +427,7 @@ lands in the same place.
   represented by the top-level `status` field and `createdAt`, with no
   need for the history array to duplicate it. This is a deliberate
   asymmetry with Issue's initial-entry decision (§4), not an
-  inconsistency: Issue's creation *is itself* a state transition
+  inconsistency: Issue's creation _is itself_ a state transition
   (`null → open`) worth recording, while Knowledge's creation is not a
   review decision and doesn't belong in a review-decision log.
 - **Concurrency:** the same read-validate-write race analyzed for Issue
@@ -463,12 +463,14 @@ proposed — adding indexes speculatively increases write overhead without
 identifiable read benefit.
 
 **User**
+
 - Unique index on `email` — enforces the uniqueness constraint for login
   identity lookup (`findOne({ email })` at authentication). Both unique
   and queried; qualifies as a uniqueness constraint and an index
   simultaneously.
 
 **Issue**
+
 - `2dsphere` on `location` — required for all geo queries: map display
   (`$geoWithin` bounding box for the Explore map viewport), nearby lookup
   (`$near` for radius search), and geospatial filtering. No geo query
@@ -482,6 +484,7 @@ identifiable read benefit.
   access pattern without the added complexity of a compound key.
 
 **Knowledge**
+
 - Index on `status` — the public Knowledge listing always filters
   `{ status: 'approved' }` (Invariant 2, no exceptions). Without this,
   the public listing scans the full collection on every page load.
@@ -490,6 +493,7 @@ identifiable read benefit.
   the Knowledge collection.
 
 **Comment**
+
 - Compound index on `(refType, refId)` — every Comment listing query
   filters by both fields together (`{ refType: 'ISSUE', refId: issueId }`).
   A compound index on both covers this exactly; a single-field index on
@@ -532,6 +536,7 @@ would justify its own index at that point. Nothing in the currently
 established design does this.
 
 **Project**
+
 - Index on `originIssue` — the "Projects originating from this Issue"
   query (`{ originIssue: issueId }`) is the primary access pattern for
   the Issue detail view's project list. Without this, the query scans
@@ -552,7 +557,7 @@ their own explicit timestamp field rather than relying on subdocument
 auto-timestamps, for clarity about what the timestamp represents (the
 transition/decision time, not a document-modification time).
 
-Audit fields: the history arrays *are* the audit trail for Issue and
+Audit fields: the history arrays _are_ the audit trail for Issue and
 Knowledge — no separate audit-log concept is introduced.
 
 ### Mongoose/MongoDB constraint vs. domain/service invariant
@@ -569,7 +574,7 @@ invariants:
 
 - **`resolverId !== verifierId`** — comparing the actor of one specific
   historical transition against another, contextual to the operation
-  being performed. A Mongoose custom validator *could* attempt this by
+  being performed. A Mongoose custom validator _could_ attempt this by
   loading the document and inspecting prior history entries mid-write,
   but that means re-implementing the domain operation's logic inside the
   persistence layer — exactly the boundary-blurring this project has
@@ -586,7 +591,7 @@ invariants:
 
 `immutable: true` (a real Mongoose schema option) is proposed as a
 best-effort guard on `reportedBy`, `author`, and `originIssue` — worth
-noting explicitly that this is *partial* protection: it prevents
+noting explicitly that this is _partial_ protection: it prevents
 `document.save()` from changing the field after it's set, but doesn't by
 itself stop every write path (e.g., a raw `updateOne`/`findOneAndUpdate`
 call can still bypass it unless the service layer disciplines itself to
@@ -599,12 +604,12 @@ backstop, not the primary mechanism.
 
 ## 7. Validation-boundary analysis
 
-| Layer | Responsibility | Does *not* own |
-|---|---|---|
-| **Domain/service** | Cross-document and contextual invariants (`resolverId !== verifierId`, `reviewerId !== authorId`), state-machine transition legality (`changeStatus`, `approve`/`reject` validating current-state + actor authority + invariants), authorization/role checks. | Input-shape validation, structural DB constraints. |
-| **Zod** | Request-shape validation at the API boundary — is `title` a non-empty string within bounds, is `location` a valid GeoJSON point, is rejection `feedback` present and non-empty. Validates *input DTOs* coming from the network. | Anything requiring DB state to evaluate (can't know if `resolverId !== verifierId` without reading the Issue). |
-| **Mongoose** | Schema-level structural integrity as a second line of defense — required fields, types, enums, `immutable` (partial), triggers index creation. | Contextual/cross-document rules (see §6). Should not be the primary enforcement point for anything Zod or the service layer already owns. |
-| **MongoDB** | Index-backed constraints (uniqueness, geospatial queries), BSON-level type storage. | Business logic of any kind. |
+| Layer              | Responsibility                                                                                                                                                                                                                                                | Does _not_ own                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Domain/service** | Cross-document and contextual invariants (`resolverId !== verifierId`, `reviewerId !== authorId`), state-machine transition legality (`changeStatus`, `approve`/`reject` validating current-state + actor authority + invariants), authorization/role checks. | Input-shape validation, structural DB constraints.                                                                                        |
+| **Zod**            | Request-shape validation at the API boundary — is `title` a non-empty string within bounds, is `location` a valid GeoJSON point, is rejection `feedback` present and non-empty. Validates _input DTOs_ coming from the network.                               | Anything requiring DB state to evaluate (can't know if `resolverId !== verifierId` without reading the Issue).                            |
+| **Mongoose**       | Schema-level structural integrity as a second line of defense — required fields, types, enums, `immutable` (partial), triggers index creation.                                                                                                                | Contextual/cross-document rules (see §6). Should not be the primary enforcement point for anything Zod or the service layer already owns. |
+| **MongoDB**        | Index-backed constraints (uniqueness, geospatial queries), BSON-level type storage.                                                                                                                                                                           | Business logic of any kind.                                                                                                               |
 
 **On duplication:** structural rules cheap to state twice (e.g.
 `required` on both the Zod input schema and the Mongoose schema) are kept
@@ -622,14 +627,14 @@ safety, it adds a second, weaker, possibly-inconsistent copy of the rule.
 Re-examined explicitly in light of the embedding decisions above, per
 instruction, rather than assumed from a pre-embedding intuition:
 
-| Operation | Documents touched | Atomic without a transaction? |
-|---|---|---|
-| Issue status change (any transition) | One (`Issue` — status field + appended history entry, same document) | Yes — single-document write is atomic in MongoDB by default. |
-| Knowledge review decision (approve/reject) | One (`Knowledge` — status field + appended history entry, same document) | Yes — same reasoning. |
-| Knowledge revise (`rejected → draft`) | One (`Knowledge`) | Yes. |
-| Project creation | One (`Project` insert; reads `Issue.status` but does not write to Issue) | Yes — no write to a second document. |
-| Project join | One (`Project` — append to `contributors`) | Yes. |
-| Comment creation | One (`Comment` insert; no write-back to Issue/Knowledge, per the already-corrected v1 bug) | Yes. |
+| Operation                                  | Documents touched                                                                          | Atomic without a transaction?                                |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Issue status change (any transition)       | One (`Issue` — status field + appended history entry, same document)                       | Yes — single-document write is atomic in MongoDB by default. |
+| Knowledge review decision (approve/reject) | One (`Knowledge` — status field + appended history entry, same document)                   | Yes — same reasoning.                                        |
+| Knowledge revise (`rejected → draft`)      | One (`Knowledge`)                                                                          | Yes.                                                         |
+| Project creation                           | One (`Project` insert; reads `Issue.status` but does not write to Issue)                   | Yes — no write to a second document.                         |
+| Project join                               | One (`Project` — append to `contributors`)                                                 | Yes.                                                         |
+| Comment creation                           | One (`Comment` insert; no write-back to Issue/Knowledge, per the already-corrected v1 bug) | Yes.                                                         |
 
 **No operation identified in the current settled domain model requires a
 multi-document transaction.** This is a direct consequence of two prior
@@ -653,13 +658,13 @@ For each item the Domain Model left open, the question here is narrower
 than resolving it: **does the proposed schema shape accidentally foreclose
 it?** In every case, the answer is no — proposed shapes are additive-safe.
 
-| Deferred item | Schema impact today | Why it stays open |
-|---|---|---|
+| Deferred item                              | Schema impact today                                                                                                                                                                         | Why it stays open                                                                                                                                                                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **D-3a** (remediation-assertion authority) | The `actor` field on `resolved`/`in_progress` status-history entries is a plain `ObjectId ref User` — not role-gated, not tied to Project membership, not requiring an "assignment" record. | Whatever D-3a eventually decides (explicit assignment, role-gate, membership-based, or a combination) can be enforced entirely in the service layer's `changeStatus` authorization check without touching this schema shape. |
-| User suspension | No `status`/`isActive` field added to `User` now. | Additive field if introduced later — no migration of existing documents required beyond a default value. |
-| Project status | No `status` field added to `Project` now, consistent with the Domain Model's explicit decision against one in V2. | Same — additive if the Act milestone later proves a need. |
-| Leaving a Project | No "leave" operation designed; `contributors` remains a plain `ObjectId` array. | An array-pull operation is trivial to add later; the array shape itself doesn't need to change to support it. |
-| Deletion/deactivation (any entity) | No `deletedAt`/`isActive` soft-delete field added anywhere. | Additive if introduced later. Hard-delete semantics remain undesigned, deliberately, matching the Domain Model's disposition. |
+| User suspension                            | No `status`/`isActive` field added to `User` now.                                                                                                                                           | Additive field if introduced later — no migration of existing documents required beyond a default value.                                                                                                                     |
+| Project status                             | No `status` field added to `Project` now, consistent with the Domain Model's explicit decision against one in V2.                                                                           | Same — additive if the Act milestone later proves a need.                                                                                                                                                                    |
+| Leaving a Project                          | No "leave" operation designed; `contributors` remains a plain `ObjectId` array.                                                                                                             | An array-pull operation is trivial to add later; the array shape itself doesn't need to change to support it.                                                                                                                |
+| Deletion/deactivation (any entity)         | No `deletedAt`/`isActive` soft-delete field added anywhere.                                                                                                                                 | Additive if introduced later. Hard-delete semantics remain undesigned, deliberately, matching the Domain Model's disposition.                                                                                                |
 
 No action is taken on any of these now — this section confirms non-
 foreclosure, it does not resolve anything.
@@ -709,7 +714,7 @@ treated as self-evidently correct:
    collections. The reasoning (§4, §5) rests on "no independent query
    requirement exists today" — worth confirming this holds against actual
    planned UI needs (e.g., does any admin view need to query status
-   changes *across* Issues, which would push toward a separate,
+   changes _across_ Issues, which would push toward a separate,
    independently-indexable collection instead). For Knowledge specifically,
    this rests on a **V2 capacity assumption**, not a domain-bounded growth
    argument — ADR-0004 places no cap on revision cycles, so embedding here

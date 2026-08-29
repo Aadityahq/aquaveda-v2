@@ -24,7 +24,8 @@ export default function Error({
         This screen hit an error.
       </h1>
       <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
-        Nothing you did caused this. Try again, and report it if it keeps happening.
+        Nothing you did caused this. Try again, and report it if it keeps
+        happening.
       </p>
       <Button onClick={reset}>Try again</Button>
     </div>

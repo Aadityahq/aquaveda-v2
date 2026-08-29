@@ -1,6 +1,12 @@
 import { Project } from "../models/Project.js";
 import { Issue } from "../models/Issue.js";
-import { unauthorized, notFound, invalidState, DomainError, DomainErrorCode } from "./errors.js";
+import {
+  unauthorized,
+  notFound,
+  invalidState,
+  DomainError,
+  DomainErrorCode,
+} from "./errors.js";
 
 /**
  * Project domain service.
@@ -19,7 +25,12 @@ import { unauthorized, notFound, invalidState, DomainError, DomainErrorCode } fr
  * make a previously-valid creation retroactively invalid.
  */
 
-const ELIGIBLE_ISSUE_STATUSES = ["acknowledged", "in_progress", "resolved", "verified"];
+const ELIGIBLE_ISSUE_STATUSES = [
+  "acknowledged",
+  "in_progress",
+  "resolved",
+  "verified",
+];
 
 function wrapMongooseValidationError(err) {
   if (err.name === "ValidationError" || err.name === "CastError") {
@@ -59,7 +70,7 @@ export async function createProject(actorContext, payload) {
   if (!ELIGIBLE_ISSUE_STATUSES.includes(issue.status)) {
     throw invalidState(
       `a Project cannot be created from an Issue with status "${issue.status}"`,
-      { issueStatus: issue.status, eligible: ELIGIBLE_ISSUE_STATUSES }
+      { issueStatus: issue.status, eligible: ELIGIBLE_ISSUE_STATUSES },
     );
   }
 

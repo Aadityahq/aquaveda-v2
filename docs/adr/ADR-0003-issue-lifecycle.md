@@ -1,6 +1,7 @@
 # ADR-0003: Issue status lifecycle
 
 ## Status
+
 Accepted, with one dependency deferred (see Consequences).
 
 ## Context
@@ -24,13 +25,13 @@ and authority model.
 
 ### State semantics
 
-| State | Meaning |
-|---|---|
-| `open` | Reported. No authorized actor has reviewed it yet. |
+| State          | Meaning                                                                                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open`         | Reported. No authorized actor has reviewed it yet.                                                                                                                                             |
 | `acknowledged` | An authorized actor has reviewed the report and accepted it for further action. (Not a claim that the report is factually verified — only that it's been reviewed and accepted for attention.) |
-| `in_progress` | Remediation work is actively underway. |
-| `resolved` | The actor performing remediation claims the problem is fixed. A claim, not a fact. |
-| `verified` | An independent, authorized Expert confirms the claimed resolution holds. The fact, following the claim. |
+| `in_progress`  | Remediation work is actively underway.                                                                                                                                                         |
+| `resolved`     | The actor performing remediation claims the problem is fixed. A claim, not a fact.                                                                                                             |
+| `verified`     | An independent, authorized Expert confirms the claimed resolution holds. The fact, following the claim.                                                                                        |
 
 ### Transition graph
 
@@ -42,6 +43,7 @@ open ──→ acknowledged ──→ in_progress ──→ resolved
 ```
 
 No other transitions are valid. In particular:
+
 - `acknowledged → open`, `in_progress → acknowledged`, `resolved → acknowledged`
   are all invalid — none describe a real state of the world.
 - `verified` is terminal. Recurrence of a previously verified issue is out
@@ -52,13 +54,13 @@ No other transitions are valid. In particular:
 
 ### Transition authority
 
-| Transition | Authority |
-|---|---|
-| `open → acknowledged` | EXPERT |
-| `acknowledged → in_progress` | Requires an authorized remediation actor. Mechanism deferred — see D-3a below. |
-| `in_progress → resolved` | Requires an authorized remediation actor. Mechanism deferred — see D-3a below. |
-| `resolved → verified` | EXPERT, and **never** the same account that set `resolved` — this is a hard invariant (`resolverId !== verifierId`), not a soft preference. |
-| `resolved → in_progress` (failed verification) | EXPERT |
+| Transition                                     | Authority                                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open → acknowledged`                          | EXPERT                                                                                                                                      |
+| `acknowledged → in_progress`                   | Requires an authorized remediation actor. Mechanism deferred — see D-3a below.                                                              |
+| `in_progress → resolved`                       | Requires an authorized remediation actor. Mechanism deferred — see D-3a below.                                                              |
+| `resolved → verified`                          | EXPERT, and **never** the same account that set `resolved` — this is a hard invariant (`resolverId !== verifierId`), not a soft preference. |
+| `resolved → in_progress` (failed verification) | EXPERT                                                                                                                                      |
 
 ADMIN does not hold Issue verification authority. Verification is a
 domain-quality assertion about a physical outcome, which is EXPERT's
@@ -122,7 +124,7 @@ is not decided by this ADR.
 ## Consequences
 
 - **D-3a is an open dependency, not an oversight.** `acknowledged →
-  in_progress` and `in_progress → resolved` both require "an authorized
+in_progress` and `in_progress → resolved` both require "an authorized
   remediation actor," but the mechanism for obtaining that authority is
   deferred to the Project/Act authorization design (see the Issue↔Project
   domain analysis). This ADR does not invent a `REMEDIATOR` role, an
