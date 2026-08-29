@@ -76,7 +76,7 @@ Recommended order:
 3. `docs/vision/vision.md` — product direction.
 4. `docs/vision/principles.md` — design/engineering philosophy.
 5. `docs/domain/domain-model.md` — domain concepts and lifecycle rules.
-6. `docs/domain/decision-register.md` — cumulative record of important decisions.
+6. `docs/architecture/decision-register.md` — cumulative record of important decisions.
 7. `docs/architecture/` — architecture-specific decisions.
 8. `docs/adr/` — why significant architectural decisions were made.
 9. `docs/engineering/standards.md` — coding rules, commits, branching, and Definition of Done.

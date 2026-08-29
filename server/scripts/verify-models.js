@@ -63,9 +63,6 @@ check("1e. Project model compiles", () => {
 // ---------------------------------------------------------------------
 // 2. Expected indexes are registered (and only those — see #8)
 // ---------------------------------------------------------------------
-function indexFieldSets(schema) {
-  return schema.indexes().map(([fields]) => Object.keys(fields).sort().join(","));
-}
 
 check("2a. User has unique email index", () => {
   const emailPath = User.schema.path("email");

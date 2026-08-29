@@ -139,4 +139,4 @@ Full lifecycle rationale, alternatives considered, and consequences for
 Issue and Knowledge live in `docs/adr/ADR-0003-issue-lifecycle.md` and
 `docs/adr/ADR-0004-knowledge-lifecycle.md`. The complete decision record
 from the Domain Model milestone — including deferred and dispositioned
-items — lives in `docs/domain/decision-register.md`.
+items — lives in `docs/architecture/decision-register.md`.

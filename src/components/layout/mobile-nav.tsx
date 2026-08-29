@@ -34,10 +34,17 @@ export function MobileNav() {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
 
-  // Close on navigation — pathname changes when a Link is followed
-  React.useEffect(() => {
+  // Close on navigation. Deliberately not a useEffect — this is "adjusting
+  // state when a prop/derived value changes," which React's own guidance
+  // says to do during render (bailing out via the prevPathname comparison
+  // below) rather than in an effect body, where the extra setState causes
+  // a second, cascading render after the one for the pathname change
+  // itself.
+  const [prevPathname, setPrevPathname] = React.useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     setOpen(false);
-  }, [pathname]);
+  }
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>

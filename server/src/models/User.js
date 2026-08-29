@@ -8,7 +8,7 @@ const { Schema } = mongoose;
  * Identity and role anchor for every other collection. This milestone
  * persists the shape only — registration, login, password hashing, and
  * role-assignment mechanisms belong to the Authentication/Governance
- * milestone (out of scope here; see docs/domain/decision-register.md D-2).
+ * milestone (out of scope here; see docs/architecture/decision-register.md D-2).
  *
  * Schema-enforceable constraints (this file):
  * - required fields, type correctness

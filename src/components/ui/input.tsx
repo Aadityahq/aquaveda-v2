@@ -2,7 +2,11 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+// A type alias, not an empty interface — an interface with no members
+// adds nothing over its supertype and trips
+// @typescript-eslint/no-empty-object-type. Kept as a named export so call
+// sites can still reference `InputProps` explicitly.
+export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {

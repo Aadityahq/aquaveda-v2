@@ -4,12 +4,13 @@
 
 ## Current Milestone
 
-Domain Model (decision phase) — **COMPLETE**
+Phase D (service implementation) — **COMPLETE and verified**
 
-Domain analysis, entity-by-entity review, and four decision clusters
-(Issue lifecycle, Knowledge lifecycle, Issue↔Project, Recommendation) are
-resolved and cross-checked for consistency. This covers domain decisions
-only — no Mongoose schemas, models, or persistence code exist yet.
+`server/src/services/` implements the five domain service operations
+(Issue, Knowledge, Comment, Project) against the Persistence Design
+schemas. Verified for real, not just written: `npm run verify:models`
+(38/38), `npm run verify:validation` (44/44), `npm test` — full service
+test suite green, including all three concurrency tests.
 
 ## Completed
 
@@ -22,7 +23,7 @@ only — no Mongoose schemas, models, or persistence code exist yet.
   in `docs/domain/domain-model.md`
 - Recommendation resolved as a derived, non-persisted service output
 - Cross-entity consistency review performed — no contradictions found
-- `docs/domain/decision-register.md` records the full disposition: locked
+- `docs/architecture/decision-register.md` records the full disposition: locked
   decisions, deferred items, implementation details, and the one
   remaining open dependency
 - `docs/domain/domain-model.md` updated with resolved lifecycles and the
@@ -36,6 +37,43 @@ the Project/Act authorization design. No role, assignment model, or
 membership-based authority has been invented to close it. This blocks
 final closure of the Issue authority matrix; it does not block persistence
 design from proceeding.
+
+### Persistence Design
+- Five collections mapped: User, Issue, Knowledge, Comment, Project.
+  Recommendation stays unpersisted (derived service output)
+- Embedded status/review history (ADR-0005), conditional atomic lifecycle
+  transitions (ADR-0006) — both locked and approved
+- `docs/architecture/persistence-design.md` (approved)
+
+### Phase D — Service Implementation
+- `server/src/services/`: `issue.service.js` (createIssue, changeStatus),
+  `knowledge.service.js` (createKnowledge, submitForReview, approve,
+  reject, revise), `comment.service.js` (createComment),
+  `project.service.js` (createProject)
+- `server/src/services/errors.js`: `DomainError` + `DomainErrorCode`
+  enum, including `AUTHORIZATION_POLICY_UNRESOLVED` as D-3a's concrete
+  runtime representation — `changeStatus()` throws it unconditionally for
+  `acknowledged → in_progress` and `in_progress → resolved`, for every
+  role. No one can move an Issue past `acknowledged` through the service
+  layer yet; this is intentional, not a bug
+- Actor context boundary: every service takes `actorContext = { id,
+  role }` as an opaque input; services never touch JWTs/headers/sessions
+- D-COMMENT-1 locked and tested: replies must target the same
+  `(refType, refId)` as their parent; cross-target and reply-to-reply
+  both rejected
+- `server/tests/`: one test file per service, plus
+  `tests/helpers/testDb.js` (isolated `TEST_MONGO_URI` connection +
+  cleanup). Full suite verified green against real MongoDB, including
+  all three concurrency tests (Issue `open→acknowledged` race, Issue
+  `resolved→verified` race, Knowledge `approve`/`reject` race)
+- Fixed during verification: CastError → `VALIDATION_FAILED` translation
+  on every service's first ID lookup; test discovery glob
+  (`"tests/**/*.test.js"`); env loading moved from `server.js` to
+  `db.js` so `npm test` (which never touches `server.js`) still gets a
+  populated `process.env`, with `TEST_MONGO_URI` enforced distinct from
+  `MONGO_URI` at runtime
+- Full detail: `docs/architecture/decision-register.md` §Persistence Design,
+  §Phase D
 
 ### Foundation Slice
 - Root app shell: `layout.tsx` with metadata, fonts (Space Grotesk,
@@ -78,7 +116,7 @@ design from proceeding.
 - `docs/adr/ADR-0003-issue-lifecycle.md`
 - `docs/adr/ADR-0004-knowledge-lifecycle.md`
 - `docs/domain/domain-model.md`
-- `docs/domain/decision-register.md`
+- `docs/architecture/decision-register.md`
 - `docs/architecture/nextjs-patterns.md`
 - `docs/future/parking-lot.md`
 
@@ -98,6 +136,15 @@ design from proceeding.
 - Issue↔Project: `0..*` cardinality, immutable required origin reference,
   no automatic authority from Project membership
 - Recommendation: derived service output, not a persisted entity
+- Persistence Design: five collections only, embedded histories
+  (ADR-0005), conditional atomic lifecycle transitions (ADR-0006), no
+  transactions, no flat actor fields (identity lives in history entries)
+- Phase D: opaque `actorContext` boundary — services never decode JWTs
+  or touch sessions, so Authentication can be built independently and
+  wired in later without touching service internals
+- Env loading anchored in `server/src/config/db.js`, not `server.js` —
+  every entry point that needs the database (app, tests, future
+  scripts) imports `db.js`, so `.env` loads consistently everywhere
 - Domain/persistence boundary deliberately preserved throughout — domain
   decisions (e.g. "status history has domain significance") are recorded
   separately from persistence-shape decisions (embedded vs. referenced),
@@ -114,24 +161,36 @@ design from proceeding.
 
 - `not-found.tsx` copy says "hasn't been built yet" — will need updating
   as real routes ship (acceptable for now, honest placeholder)
-- `server/` has no code yet — intentional, Persistence Design milestone
-  brings the first of it
 - **D-3a (remediation-assertion authority) remains unresolved** — not
   technical debt in the usual sense, but an explicitly deferred domain
-  dependency. Do not resolve it by inventing a role, assignment model, or
+  dependency, now enforced in code as `AUTHORIZATION_POLICY_UNRESOLVED`.
+  Do not resolve it by inventing a role, assignment model, or
   membership-based authority without a dedicated Project/Act
   authorization design session.
+- `decision-register.md`'s Phase D section (this update) should be
+  reviewed alongside the actual PR/diff by ChatGPT before Authentication
+  work begins, per the project's propose → review → correct → lock cycle
+- No API routes/controllers exist yet — the nine service operations are
+  only reachable from tests, not from Express. Intentional; sequencing
+  decision below.
 
 ## Next Milestone
 
-**Persistence Design** (analysis phase, precedes schema implementation) —
-map the settled domain model onto MongoDB/Mongoose while preserving the
-domain decisions in ADR-0003, ADR-0004, and `docs/domain/domain-model.md`.
-Entity→collection mapping, embedded-vs-referenced relationships, status/
-review-history persistence shape, indexes, and the Zod/Mongoose validation
-boundary are analyzed and reviewed before any schema is written.
+**Proposed: Authentication** (not yet confirmed by review) — build real
+session/identity so service calls get a real `actorContext` instead of a
+hand-constructed test fixture, rather than starting API routes/
+controllers first. Rationale: routes built before auth invite the
+temptation to stub identity inline in controllers "temporarily," which
+this project has been deliberately avoiding elsewhere. Routes/
+controllers would follow once Authentication produces a real
+`actorContext`.
 
-After Persistence Design: Authentication.
+This sequencing has not gone through the propose → review → correct →
+lock cycle with ChatGPT yet — treat it as a recommendation, not a locked
+decision, until reviewed.
+
+D-3a is explicitly **not** in scope for Authentication — it requires a
+Project/Act authorization design, not an identity/session design.
 
 ## Reviewer Notes
 
@@ -151,4 +210,17 @@ authorization design this project doesn't have yet, and inventing an
 answer now would be exactly the premature-abstraction failure mode this
 project has been deliberately avoiding.
 
-Ready to begin Persistence Design (analysis phase).
+Persistence Design (ADR-0005, ADR-0006) and Phase D (service
+implementation) both closed since the last review pass and are not yet
+reviewed by ChatGPT — flagged for review before Authentication work
+begins, per this project's standard cycle.
+
+Phase D closure is backed by real test execution (`npm test` against
+live MongoDB via `TEST_MONGO_URI`), not just code existing — including
+all three concurrency tests. Two fixes were required during verification
+(CastError translation, env-loading anchored in `db.js` instead of
+`server.js`) — both are recorded in `decision-register.md` so they don't
+get silently reverted later.
+
+Next milestone (Authentication) is a proposal pending review, not a
+locked decision — see Next Milestone section above.

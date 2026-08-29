@@ -7,6 +7,27 @@ import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /**
+ * Client-only mount flag via useSyncExternalStore rather than the classic
+ * `useState(false) + useEffect(() => setState(true))` pattern — the
+ * latter calls setState synchronously inside an effect body, which
+ * react-hooks/set-state-in-effect now flags because it causes a
+ * cascading extra render. useSyncExternalStore's getServerSnapshot vs.
+ * getSnapshot split expresses "different value on server vs. client"
+ * directly, without ever calling setState from an effect.
+ *
+ * subscribe is a no-op: mount status changes exactly once and reading it
+ * again after mount can't produce a different value, so there's nothing
+ * to resubscribe to.
+ */
+function useMounted() {
+  return React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
+
+/**
  * Must be a Client Component — it reads resolvedTheme from localStorage
  * via next-themes, which only exists in the browser.
  *
@@ -23,11 +44,7 @@ import { Button } from "@/components/ui/button";
  */
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   if (!mounted) {
     // Placeholder matches the real button's dimensions exactly.

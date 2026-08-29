@@ -28,7 +28,7 @@ const { Schema } = mongoose;
  * resolve or imply an answer to D-3a (remediation-assertion authority).
  * No role, assignment, or membership-based authorization mechanism is
  * introduced here or anywhere in this model. See
- * docs/domain/decision-register.md D-3a and ADR-0003.
+ * docs/architecture/decision-register.md D-3a and ADR-0003.
  *
  * `progress` is not specified by any approved document beyond "creator-
  * controlled progress tracking." No persistence document locks its shape.

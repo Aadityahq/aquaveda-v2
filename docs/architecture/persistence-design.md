@@ -3,7 +3,7 @@
 **Status:** Approved. Analysis only — no Mongoose schemas,
 models, connection code, or dependency installation. This document maps
 the settled Domain Model (`docs/domain/domain-model.md`, ADR-0003,
-ADR-0004, `docs/domain/decision-register.md`) onto MongoDB/Mongoose
+ADR-0004, `docs/architecture/decision-register.md`) onto MongoDB/Mongoose
 without foreclosing anything the Domain Model deliberately left open.
 
 The discipline carried over from the Domain Model milestone applies here
