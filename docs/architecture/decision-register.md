@@ -1,11 +1,12 @@
 # Decision register
 
 This is the single canonical decision register for AquaVeda v2,
-consolidating decisions from the Domain Model, Persistence Design, and
-Phase D (service implementation) milestones. It was previously split
-across two files (`docs/domain/decision-register.md` and this file);
-that split was accidental, not an intentional two-register architecture,
-and the files had begun to drift. This document supersedes both.
+consolidating decisions from the Domain Model, Persistence Design,
+Phase D (service implementation), and Authentication (architecture)
+milestones. It was previously split across two files
+(`docs/domain/decision-register.md` and this file); that split was
+accidental, not an intentional two-register architecture, and the files
+had begun to drift. This document supersedes both.
 
 Domain Model milestone: produced through a staged review — full
 entity-by-entity analysis → four decision clusters (Issue lifecycle,
@@ -20,23 +21,30 @@ Phase D milestone: implemented and tested the five domain service
 operations against the approved persistence schemas. Verified end-to-end
 against real MongoDB, not just written — see below.
 
+Authentication milestone: architecture reviewed and locked through four
+rounds of proposal → correction (deployment topology, cookie transport,
+security posture, scope boundary, session storage, JWT design, rotation
+guarantee, logout semantics). Implementation has **not** started —
+see the "🟠 Proposed — not yet locked" section for what remains.
+
 D-3a remains unresolved (see below) and is unaffected by Persistence
-Design's or Phase D's completion — this register is not a record of a
-fully closed project state, only of the decisions made so far.
+Design's, Phase D's, or Authentication's completion — this register is
+not a record of a fully closed project state, only of the decisions
+made so far.
 
 ## 🔒 Locked — Domain Model (see ADR-0003, ADR-0004, `domain-model.md`)
 
 - Issue lifecycle: 5-state graph, transition authority, `resolverId !==
-verifierId`, EXPERT-only verification, `acknowledged` mandatory,
+  verifierId`, EXPERT-only verification, `acknowledged` mandatory,
   failed-verification routes to `in_progress` only, `verified` terminal
   for V2.
 - Knowledge lifecycle: `draft → pending_review → approved | rejected →
-draft`, EXPERT-only review authority, `reviewerId !== authorId`,
+  draft`, EXPERT-only review authority, `reviewerId !== authorId`,
   mandatory rejection feedback, content locked during `pending_review`, no
   re-review of approved content in V2.
 - Issue ↔ Project: `Issue 0..* Project`, immutable required origin
   reference, creation gated to Issue status ∈ `{acknowledged, in_progress,
-resolved, verified}`, independent ownership, independent lifecycles, no
+  resolved, verified}`, independent ownership, independent lifecycles, no
   automatic Issue authority from Project membership.
 - Recommendation: derived service output, no persistence, no
   ownership/lifecycle/authority, Invariant 7 as a service-boundary
@@ -57,7 +65,7 @@ resolved, verified}`, independent ownership, independent lifecycles, no
   Model milestone's rejection of a generic history primitive, ADR-0005).
 - `Issue.statusHistory` includes the initial creation entry —
   `{fromStatus: null, toStatus: "open", actor: reportedBy, timestamp:
-createdAt}` — so it is the complete lifecycle log, not just
+  createdAt}` — so it is the complete lifecycle log, not just
   post-creation transitions. `Knowledge.reviewHistory` records review
   decisions only (approve/reject), with no synthetic entry for
   `draft`/`pending_review`.
@@ -127,7 +135,7 @@ suite green, including all three concurrency tests (Issue
 - **`AUTHORIZATION_POLICY_UNRESOLVED` is D-3a made concrete.**
   `changeStatus()` throws this error, distinct from `FORBIDDEN`, for
   every attempt at `acknowledged → in_progress` or `in_progress →
-resolved`, unconditionally, for every role. No one can move an Issue
+  resolved`, unconditionally, for every role. No one can move an Issue
   past `acknowledged` through the service layer. This is working-as-
   designed, not a bug — do not close it by inventing a `REMEDIATOR`
   role, Project-membership authority, or any assignment model. D-3a is
@@ -157,7 +165,7 @@ resolved`, unconditionally, for every role. No one can move an Issue
     only in `server.js`. The test suite imports `db.js` directly via
     `testDb.js` and never touches `server.js`, so `process.env` was
     never populated when running `npm test` — failing with `Missing
-required environment variable: MONGO_URI` even though `.env` was
+    required environment variable: MONGO_URI` even though `.env` was
     correct and the app connected fine under `npm start`.
   - **Do not** remove the `dotenv/config` import from `db.js` as
     apparently-unused or redundant with `server.js`'s own import — it
@@ -176,18 +184,129 @@ required environment variable: MONGO_URI` even though `.env` was
   helpers (e.g. `tests/helpers/testDb.js`) are excluded by the glob,
   not by naming discipline alone.
 
+## 🔒 Locked — Authentication (architecture; implementation not yet started)
+
+Full derivation, options considered, and rejected alternatives:
+`docs/architecture/authentication-milestone-review-draft.md`,
+`authentication-scope-boundary-analysis.md`,
+`authentication-session-storage-design.md`, and
+`authentication-architecture-decision-report.md`.
+
+- **Deployment topology**: Topology B — frontend and backend deploy
+  independently; the browser talks to the API over HTTPS as a separate
+  deployment unit. Cookie/CORS configuration must be correct for genuine
+  cross-origin operation, not tuned loosely for local same-origin
+  convenience.
+- **Browser token transport**: HttpOnly cookies only, for both access
+  and refresh tokens. No `localStorage`, no `sessionStorage`, no
+  frontend-managed bearer headers, ever.
+- **Cookie attributes**: `HttpOnly: true` (all environments) and
+  `Secure: true` (production) are locked outright. `SameSite`, `Domain`,
+  and `Path` are deployment-dependent and deliberately left open until
+  actual hosting targets are chosen. **`SameSite` does not default to
+  "cross-site" merely because Topology B separates the deployments** —
+  the relevant fact is *registrable domain*, not deployment
+  independence. Sibling subdomains under one parent domain are same-site
+  and use `SameSite=Lax`; only genuinely different registrable domains
+  require `SameSite=None` (with mandatory `Secure`).
+- **Security posture**: proportionate to a low-friction community
+  platform — correctness, reasonable security, maintainability, low
+  friction, operational simplicity, in that order. Not banking-grade
+  ceremony; do not add heavyweight security infrastructure (device
+  fingerprinting, reuse-detection systems, MFA, etc.) without a concrete
+  requirement.
+- **Milestone scope**: authentication infrastructure **and** a
+  five-endpoint minimal auth API (`POST /auth/register`,
+  `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`,
+  `POST /auth/refresh`). General domain routes (Issue, Knowledge,
+  Comment, Project) remain fully deferred to a future Routes milestone.
+- **Scope boundary test**: an endpoint belongs to Authentication iff its
+  responsibility is establishing, resolving, or terminating an
+  authenticated session/identity — not merely because it happens to be
+  implemented via a particular file. Today that means it never invokes
+  a pre-existing domain service; that file-level fact is a consequence
+  of the responsibility boundary, not its definition.
+- **`actorContext` contract unchanged**: `{ id, role }`, opaque input to
+  every domain service, exactly as Phase D established. Authentication
+  middleware is the sole producer. No domain service signature changes.
+- **D-3a remains fully unresolved.** `AUTHORIZATION_POLICY_UNRESOLVED`
+  stays exactly as Phase D implemented it for
+  `acknowledged → in_progress` and `in_progress → resolved`.
+  Authentication establishes identity and role; it does not, and must
+  not be used to, determine remediation authority. The arrival of real
+  roles via Authentication is not itself a resolution mechanism.
+- **Refresh-token/session storage**: a dedicated `Session` collection,
+  not a `User`-embedded field. Governing rationale is separation of
+  responsibility, lifecycle, retention, and invalidation semantics
+  between identity and session — independent of rotation strategy or
+  write frequency. Collection is named `Session`, not `RefreshToken`,
+  since it may eventually carry more than a token hash (revocation
+  metadata, last-used timestamps, device metadata if ever justified).
+- **JWT payload — identity only, no role.** Role is never trusted from
+  a token; always resolved fresh from the database on every request
+  that needs `actorContext` (this is the specific V1 defect being
+  corrected — V1's JWT middleware trusted the decoded payload's role
+  without a DB lookup). Payload composition differs by token:
+  - **Access token: `{ sub }` only.** Confirmed against a concrete
+    test, not assumed: access-token verification only ever needs a
+    `User` lookup by `sub` for role resolution, never a `Session`
+    lookup, so `sid` has no consuming code path there. Adding `sid` to
+    the access token for hypothetical future revocation-propagation use
+    is rejected — no current requirement calls for instant
+    access-token revocation, and the proportionate mechanism for
+    bounding post-logout/revocation exposure is the token's short
+    lifetime (see logout/expiry entry below), not a per-request session
+    lookup on the hot path of every authenticated request.
+  - **Refresh token: `{ sub, sid }`.** `sid` (the `Session` document's
+    own `_id`) is required so refresh can resolve the exact `Session`
+    being rotated, rather than resolving by `userId` alone — the latter
+    breaks as soon as multiple concurrent sessions exist, which the
+    `Session`-collection design deliberately doesn't preclude.
+- **Credential storage**: refresh tokens are stored server-side only as
+  hashes (`Session.tokenHash`), never as raw tokens — consistent with
+  `User.passwordHash`'s existing pattern.
+- **Session expiry enforcement**: a MongoDB TTL index on
+  `Session.expiresAt` handles eventual physical cleanup but is **not**
+  the expiry check itself — the TTL monitor's sweep is periodic, not
+  real-time. The service layer must independently verify
+  `expiresAt > now` before treating any session as valid, regardless of
+  whether MongoDB has physically deleted an expired document yet.
+- **Refresh strategy — simple rotation.** Each successful refresh
+  invalidates the prior `Session` document and issues a new one. No
+  reuse-detection system, no device fingerprinting.
+- **Single-use refresh guarantee is a locked architectural requirement,
+  not an implementation detail.** Once a refresh token has been used to
+  rotate, that exact token must never succeed again — a second attempt
+  with the same superseded token must fail, unconditionally, regardless
+  of timing. Only the technical mechanism enforcing this under
+  concurrent requests is left to implementation planning (recommended:
+  reuse the same conditional-atomic-update discipline already proven
+  for Issue/Knowledge lifecycle transitions under ADR-0006, rather than
+  inventing a new pattern).
+- **Logout does not, and cannot, invalidate an already-issued
+  unexpired access token — this is intended behavior, not a gap.**
+  Logout deletes the current `Session` document, immediately
+  invalidating the refresh token. The access token is a stateless JWT
+  verified without any DB/session lookup, so it continues to
+  authenticate requests until its own short natural expiry
+  (`JWT_ACCESS_EXPIRES`). This is the accepted proportionate trade-off
+  under the locked security posture, not a bug to be fixed by adding a
+  per-request session-validity check to the access-token path — doing
+  so would reintroduce exactly the per-request `Session` lookup the JWT
+  payload decision above rejected.
+
 ## ⏸️ Deferred
 
-| Item                                           | Note                                                                                                                          |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| User suspension/deactivation                   | No current requirement; adding a status field now would be speculative                                                        |
-| Expert role acquisition mechanism              | Belongs to the Authentication/Governance milestone — `role: EXPERT` as a fact is established, the assignment _process_ is not |
-| Comment deletion (soft/hard)                   | No v1 precedent, no current requirement                                                                                       |
-| Project status field                           | Explicitly decided against for V2; revisit only if the Act milestone proves a need                                            |
-| Leaving a project                              | No v1 precedent, no current requirement                                                                                       |
-| Admin governance of already-approved Knowledge | Real future need, not solved by extending approval authority now                                                              |
-| Re-review of approved Knowledge                | Out of scope for V2                                                                                                           |
-| Issue recurrence / reopening `verified`        | Parked; a future `relatedIssue` reference is the likely shape, not un-terminaling `verified`                                  |
+| Item | Note |
+|---|---|
+| User suspension/deactivation | No current requirement; adding a status field now would be speculative |
+| Expert role acquisition mechanism | Belongs to the Authentication/Governance milestone — `role: EXPERT` as a fact is established, the assignment *process* is not |
+| Comment deletion (soft/hard) | No v1 precedent, no current requirement |
+| Project status field | Explicitly decided against for V2; revisit only if the Act milestone proves a need |
+| Leaving a project | No v1 precedent, no current requirement |
+| Admin governance of already-approved Knowledge | Real future need, not solved by extending approval authority now |
+| Re-review of approved Knowledge | Out of scope for V2 |
+| Issue recurrence / reopening `verified` | Parked; a future `relatedIssue` reference is the likely shape, not un-terminaling `verified` |
 
 ## 🔧 Implementation detail (resolved when the relevant schema is written, no ADR needed)
 
@@ -248,12 +367,15 @@ EXPERT/ADMIN-only, or a combination.
 
 ## 🟠 Proposed — not yet locked
 
-**Next milestone: Authentication.** Proposed to build real
-session/identity so service calls receive a real `actorContext` instead
-of a hand-constructed test fixture, and to sequence it ahead of API
-routes/controllers so routes are never tempted to stub identity inline.
+**Authentication implementation.** The Authentication milestone's
+*architecture* is now locked (see "🔒 Locked — Authentication" above) —
+deployment topology, cookie transport, security posture, scope
+boundary, session storage, JWT payload design, rotation guarantee, and
+logout semantics have all been through the project's review →
+correction → lock cycle. What remains proposed, not yet locked, is the
+**implementation plan** itself: exact file-by-file build order, exact
+`DomainErrorCode` names, exact Zod schemas, and the concrete rotation
+atomicity mechanism (see the four remaining implementation-level items
+in `authentication-architecture-decision-report.md` §2). No code has
+been written yet.
 
-This is a **proposal only** — it has not gone through this project's
-review → correction → lock cycle with the Principal Architect. Do not
-treat it as a locked architectural decision until that review happens
-and this section is updated to reflect the outcome.
