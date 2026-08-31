@@ -1,5 +1,5 @@
-import "dotenv/config";
 import mongoose from "mongoose";
+import { getRequiredEnv } from "./env.js";
 
 /**
  * Mongoose connection boundary.
@@ -13,32 +13,22 @@ import mongoose from "mongoose";
  *
  * This module does not know about Express, routes, or business logic.
  *
- * Environment loading lives HERE, not in server.js. This is the only
- * module that actually needs env vars to connect, and it's imported by
- * both the application entry point (server.js) and the test suite
- * (tests/helpers/testDb.js) — anchoring the dotenv import at the point
- * of consumption means every consumer gets a populated process.env
- * regardless of which entry point they came through. `dotenv/config` is
- * idempotent and a no-op when the vars are already present (e.g. CI
- * environments that inject env vars directly), so this is safe to import
- * unconditionally.
+ * Environment loading itself lives in `./env.js`, not here — this
+ * module used to own the `dotenv/config` import directly (see git
+ * history / decision-register.md's Phase D section for why that was
+ * originally the case), but that made env loading an accidental side
+ * effect of importing the database module specifically. `env.js` is now
+ * the one intentional configuration entry point; this module imports it
+ * like any other config consumer would, and reuses its
+ * `getRequiredEnv()` helper rather than defining its own copy. This is
+ * a mechanical refactor — `connectDB()`'s connection logic and its
+ * `{ envVar }` mechanism are unchanged below.
  */
 
 // Tracks an in-flight connection attempt so concurrent calls to connectDB()
 // (e.g. during startup) reuse the same attempt instead of racing to open a
 // second connection.
 let connectionPromise = null;
-
-function getRequiredEnv(name) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(
-      `Missing required environment variable: ${name}. ` +
-        "See server/README.md for the expected environment variables.",
-    );
-  }
-  return value;
-}
 
 /**
  * Connect to MongoDB. Safe to call multiple times — returns the existing
