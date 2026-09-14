@@ -162,7 +162,17 @@ All currently implemented domain operations require an authenticated actor at th
 
 Browser authentication uses HttpOnly cookies only. Access or refresh tokens are not stored in `localStorage` or `sessionStorage`, and the frontend does not create bearer-token headers. For local browser authentication, set `NEXT_PUBLIC_API_URL=http://localhost:5000` in the root `.env.local`; keep backend secrets and database URIs in the ignored `server/.env` file.
 
+The frontend session bootstrap distinguishes `initializing`, `authenticated`, `anonymous`, `session-failure`, and `unavailable`. A confirmed anonymous state is only reached after the expected unauthenticated `/me` plus expected refresh rejection; network failures and unexpected backend responses remain explicit failure states rather than being misreported as anonymous.
+
 See [`docs/architecture/auth-boundaries.md`](docs/architecture/auth-boundaries.md) for the concrete route contracts, session states, failure handling, unresolved D-3a boundary, and current limitations.
+
+---
+
+## Frontend authentication
+
+The frontend authentication experience is available at `/login` and `/register`. Anonymous users see public navigation and authentication links; authenticated users see session controls and can sign out. The app initializes session state through `/api/v1/auth/me` and makes one refresh attempt when an expired access session may be recoverable. A successful logout clears the frontend session state after the backend clears the session cookies.
+
+Authentication uses HttpOnly cookies. The frontend does not store authentication tokens, parse JWTs, or send Bearer headers. `RequireAuth` provides the reusable boundary for contribution actions: it waits while session state is loading, guides anonymous users to sign in, and allows authenticated users to continue. Backend authentication and authorization remain authoritative.
 
 ---
 
