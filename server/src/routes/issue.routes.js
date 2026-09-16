@@ -16,8 +16,8 @@ import {
  * routes-milestone-discovery-report.md and
  * routes-implementation-plan.md Phase 3.
  *
- * Exactly 2 routes, 1:1 with issue.service.js's 2 exported operations
- * (ROUTE-L2) — no retrieval/listing, no edit/delete.
+ * Includes public issue listing with pagination (Issue #40), issue
+ * creation, and issue status transition operations.
  *
  * UPDATED (Issue #48): 2 public read routes added — GET / (list) and
  * GET /:issueId (detail). ROUTE-L2 is explicitly amended, not silently
@@ -28,13 +28,7 @@ import {
  *
  * Kept thin, matching auth.routes.js's own convention: HTTP request →
  * validate → issue.service.js → HTTP response via the shared
- * sendSuccess/sendError utility (ROUTE-L4/L6). No requireActor/
- * requireRole call anywhere in this file (ROUTE-L3) — every operation
- * already enforces its own actor/role requirements; a route-level gate
- * would only duplicate that, not add anything. No JWT verification, no
- * cookie parsing here — req.actorContext is already resolved by the
- * globally-mounted authMiddleware (ROUTE-L1) before this router ever
- * runs.
+ * sendSuccess/sendError utility (ROUTE-L4/L6).
  */
 
 export const issueRouter = Router();
