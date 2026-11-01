@@ -289,7 +289,7 @@ describe("GET /api/v1/issues (Issue #40 pagination & Issue #48 public read)", ()
 });
 
 describe("POST /api/v1/issues", () => {
-  it("201s and returns the created Issue in the complete canonical envelope", async () => {
+  it("201s and returns the created Issue in the complete canonical envelope (ROUTE-L6)", async () => {
     const { accessToken } = await makeAuthedUser("USER");
     const res = await request("POST", "/api/v1/issues", {
       cookies: authCookie(accessToken),
@@ -304,9 +304,12 @@ describe("POST /api/v1/issues", () => {
     assert.equal(res.json.success, true);
     assert.equal(res.json.data.title, "Leaking pipe");
     assert.equal(res.json.data.status, "open");
+    assert.equal(typeof res.json.message, "string");
+    assert.ok(res.json.message.length > 0);
+    assert.equal(Object.keys(res.json).sort().join(","), "data,message,success");
   });
 
-  it("400s with VALIDATION_FAILED for a missing title", async () => {
+  it("400s with VALIDATION_FAILED for a missing title, with the complete canonical failure envelope (ROUTE-L6)", async () => {
     const { accessToken } = await makeAuthedUser("USER");
     const res = await request("POST", "/api/v1/issues", {
       cookies: authCookie(accessToken),
@@ -316,10 +319,57 @@ describe("POST /api/v1/issues", () => {
     assert.equal(res.status, 400);
     assert.equal(res.json.success, false);
     assert.equal(res.json.data, null);
+    assert.equal(typeof res.json.message, "string");
+    assert.ok(res.json.message.length > 0);
     assert.equal(res.json.code, "VALIDATION_FAILED");
+    assert.equal(Object.keys(res.json).sort().join(","), "code,data,message,success");
   });
 
-  it("401s with UNAUTHORIZED for an anonymous request", async () => {
+  it("201s and persists canonical category/severity, returned in the public read", async () => {
+    const { accessToken } = await makeAuthedUser("USER");
+    const res = await request("POST", "/api/v1/issues", {
+      cookies: authCookie(accessToken),
+      body: {
+        title: "Leaking pipe",
+        description: "Water pooling near the market",
+        location: validPoint(),
+        category: "leakage_wastage",
+        severity: "high",
+      },
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.json.data.category, "leakage_wastage");
+    assert.equal(res.json.data.severity, "high");
+
+    const detail = await request("GET", `/api/v1/issues/${res.json.data._id}`);
+    assert.equal(detail.json.data.category, "leakage_wastage");
+    assert.equal(detail.json.data.severity, "high");
+  });
+
+  it("201s without category/severity, leaving them unclassified", async () => {
+    const { accessToken } = await makeAuthedUser("USER");
+    const res = await request("POST", "/api/v1/issues", {
+      cookies: authCookie(accessToken),
+      body: { title: "t", description: "d", location: validPoint() },
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.json.data.category, "");
+    assert.equal(res.json.data.severity, "");
+  });
+
+  it("400s with VALIDATION_FAILED for a non-canonical category or severity", async () => {
+    const { accessToken } = await makeAuthedUser("USER");
+    for (const extra of [{ category: "infrastructure" }, { severity: "urgent" }, { category: "" }]) {
+      const res = await request("POST", "/api/v1/issues", {
+        cookies: authCookie(accessToken),
+        body: { title: "t", description: "d", location: validPoint(), ...extra },
+      });
+      assert.equal(res.status, 400, JSON.stringify(extra));
+      assert.equal(res.json.code, "VALIDATION_FAILED");
+    }
+  });
+
+  it("401s with UNAUTHORIZED for an anonymous request (no cookie)", async () => {
     const res = await request("POST", "/api/v1/issues", {
       body: {
         title: "Leaking pipe",
@@ -346,7 +396,7 @@ describe("PATCH /api/v1/issues/:issueId/status", () => {
     return res.json.data;
   }
 
-  it("200s on a valid EXPERT-authorized transition", async () => {
+  it("200s on a valid EXPERT-authorized transition (open -> acknowledged)", async () => {
     const reporter = await makeAuthedUser("USER");
     const expert = await makeAuthedUser("EXPERT");
     const issue = await makeOpenIssue(reporter.accessToken);
@@ -399,6 +449,53 @@ describe("PATCH /api/v1/issues/:issueId/status", () => {
     assert.equal(res.status, 404);
     assert.equal(res.json.code, "NOT_FOUND");
   });
+
+  it("400s with VALIDATION_FAILED (CastError translation) for a malformed issueId", async () => {
+    const expert = await makeAuthedUser("EXPERT");
+
+    const res = await request("PATCH", "/api/v1/issues/not-a-valid-object-id/status", {
+      cookies: authCookie(expert.accessToken),
+      body: { targetStatus: "acknowledged" },
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.json.code, "VALIDATION_FAILED");
+  });
+
+  it("409s with AUTHORIZATION_POLICY_UNRESOLVED (never 403) for the D-3a-gated acknowledged -> in_progress transition", async () => {
+    const expert = await makeAuthedUser("EXPERT");
+    const issue = await makeOpenIssue(expert.accessToken);
+
+    // Move to acknowledged first (a legal, EXPERT-authorized transition).
+    await request("PATCH", `/api/v1/issues/${issue._id}/status`, {
+      cookies: authCookie(expert.accessToken),
+      body: { targetStatus: "acknowledged" },
+    });
+
+    const res = await request("PATCH", `/api/v1/issues/${issue._id}/status`, {
+      cookies: authCookie(expert.accessToken),
+      body: { targetStatus: "in_progress" },
+    });
+
+    assert.equal(res.status, 409);
+    assert.notEqual(res.status, 403);
+    assert.equal(res.json.code, "AUTHORIZATION_POLICY_UNRESOLVED");
+    assert.equal(res.json.success, false);
+    assert.equal(res.json.data, null);
+  });
+
+  it("409s with STATE_RACE style envelope on a genuinely illegal transition (open -> verified)", async () => {
+    const expert = await makeAuthedUser("EXPERT");
+    const issue = await makeOpenIssue(expert.accessToken);
+
+    const res = await request("PATCH", `/api/v1/issues/${issue._id}/status`, {
+      cookies: authCookie(expert.accessToken),
+      body: { targetStatus: "verified" },
+    });
+
+    assert.equal(res.status, 409);
+    assert.equal(res.json.code, "INVALID_STATE");
+  });
 });
 
 
@@ -426,5 +523,55 @@ describe("GET /api/v1/issues/:issueId (Issue #48 — public read, no auth requir
     const res = await request("GET", "/api/v1/issues/not-a-valid-object-id");
     assert.equal(res.status, 400);
     assert.equal(res.json.code, "VALIDATION_FAILED");
+  });
+});
+
+describe("POST /api/v1/issues — locationLabel (#134, backward compatible)", () => {
+  const POINT = { type: "Point", coordinates: [85.1376, 25.5941] };
+  const base = { title: "Leak", description: "Pipe burst", location: POINT };
+
+  it("creates an issue without a label exactly as before (field absent)", async () => {
+    const { accessToken } = await makeAuthedUser();
+    const res = await request("POST", "/api/v1/issues", { body: base, cookies: authCookie(accessToken) });
+    assert.equal(res.status, 201);
+    assert.equal(res.json.data.locationLabel, undefined);
+    assert.equal((await Issue.findById(res.json.data._id).lean()).locationLabel, undefined);
+  });
+
+  it("persists a normalized label and returns it in the DTO; coordinates untouched", async () => {
+    const { accessToken } = await makeAuthedUser();
+    const res = await request("POST", "/api/v1/issues", {
+      body: { ...base, locationLabel: "  Kankarbagh,\n Patna " },
+      cookies: authCookie(accessToken),
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.json.data.locationLabel, "Kankarbagh, Patna");
+    assert.deepEqual(res.json.data.location.coordinates, POINT.coordinates);
+    const listed = await request("GET", "/api/v1/issues");
+    assert.equal(listed.json.data.items[0].locationLabel, "Kankarbagh, Patna");
+  });
+
+  it("rejects markup and over-length labels with 400 and creates nothing", async () => {
+    const { accessToken } = await makeAuthedUser();
+    for (const bad of ["<script>x</script>", "x".repeat(201), 42]) {
+      const res = await request("POST", "/api/v1/issues", {
+        body: { ...base, locationLabel: bad },
+        cookies: authCookie(accessToken),
+      });
+      assert.equal(res.status, 400);
+    }
+    assert.equal(await Issue.countDocuments(), 0);
+  });
+
+  it("an unlabeled legacy issue stays listable and filterable by bbox", async () => {
+    const { user } = await makeAuthedUser();
+    await Issue.create({
+      title: "Legacy", description: "no label", location: POINT, reportedBy: user.id,
+      status: "open", statusHistory: [{ fromStatus: null, toStatus: "open", actor: user.id, timestamp: new Date() }],
+    });
+    const res = await request("GET", "/api/v1/issues?bbox=85,25,86,26");
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.items.length, 1);
+    assert.equal(res.json.data.items[0].locationLabel, undefined);
   });
 });

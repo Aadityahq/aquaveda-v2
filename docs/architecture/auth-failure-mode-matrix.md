@@ -30,9 +30,13 @@ This document provides the exhaustive, production-grade **Failure-Mode Matrix** 
 6. Rate limiting & denial-of-service mitigations.
 7. Configured cross-origin cookie transport and information disclosure protections.
 
-Rate limiting is not implemented in the current `server/src/app.js` and is
-therefore not part of the active Issue #36 contract. The rate-limit
-environment variables remain reserved for a future implementation.
+Rate limiting is not applied globally in `server/src/app.js`. It is applied
+per route (Issue #42, `server/src/middleware/rate-limiter.js`): IP-keyed
+sliding-window limiters on `POST /api/v1/auth/register`,
+`POST /api/v1/auth/login` and `POST /api/v1/auth/refresh`, and on
+`POST /api/v1/expert-application`. Throttled requests return `429` with the
+canonical envelope and code `TOO_MANY_REQUESTS`
+(`server/tests/rate-limiter.integration.test.js`).
 
 ---
 
@@ -58,7 +62,7 @@ All authentication error responses across the AquaVeda API conform to a uniform 
 | **`404 Not Found`** | Resource or route missing | Request to non-existent endpoint or missing entity target. |
 | **`409 Conflict`** | Request conflicts with current server state | Email address already taken on registration (`EMAIL_ALREADY_REGISTERED`). |
 | **`422 Unprocessable`** | Semantic validation errors | Reserved for multi-field semantic errors if differentiated from 400. In AquaVeda v2, request-shape errors map to 400 per Zod convention. |
-| **`429 Too Many Requests`** | Rate limit quota exceeded | Excessive requests within sliding window (`RATE_LIMIT_EXCEEDED`). |
+| **`429 Too Many Requests`** | Rate limit quota exceeded | Excessive requests within sliding window (`TOO_MANY_REQUESTS`). |
 | **`500 Internal Error`** | Unhandled server exception | Database down, uncaught exception (`INTERNAL_ERROR`). Always sanitized. |
 
 ---
@@ -101,6 +105,8 @@ All authentication error responses across the AquaVeda API conform to a uniform 
 | **OUT-02** | `POST /logout` | Expired or tampered refresh cookie | `200` | N/A | N/A | `Set-Cookie` clears cookies | No session to delete; no error raised to client. |
 | **CORS-01**| Any | Origin not in `ALLOWED_ORIGINS` | `200/204` | N/A | N/A | No `Access-Control-Allow-Origin` header | Express `cors` invokes `callback(null, false)`. Browser blocks response from being read. |
 | **CORS-02**| Preflight `OPTIONS` | Disallowed origin preflight | `204/404` | N/A | N/A | No `Access-Control-Allow-*` headers | Browser refuses cross-origin POST/GET with credentials. |
+| **CSRF-01**| State-changing request | Disallowed `Origin` or `Referer` | `403` | `FORBIDDEN` | `"Forbidden"` | No state-changing handler runs | `csrfOriginGuard` independently validates browser provenance; CORS alone is not treated as CSRF protection. |
+| **CSRF-02**| State-changing request | Configured frontend origin or referer | Continues normally | N/A | N/A | Credentialed request remains supported | The existing `ALLOWED_ORIGINS` allowlist is reused so legitimate frontend cookie requests continue to work. |
 | **RATE-01**| Authentication endpoints | Rate limiting | N/A | N/A | N/A | N/A | Not implemented in the current API; reserved for a future security milestone. |
 | **ERR-01** | Any | Unhandled exception (e.g. DB connection dropped) | `500` | `INTERNAL_ERROR` | `"Internal server error"` | None | Unmapped exceptions sanitized; full stack trace logged to console only. |
 
@@ -137,6 +143,7 @@ All authentication error responses across the AquaVeda API conform to a uniform 
   3. `HttpOnly=true` is locked on all auth cookies, immunizing tokens against XSS theft.
   4. Path restriction: `refresh_token` is restricted to `path=/api/v1/auth`, preventing transmission on general API calls.
   5. CORS allowlist: Wildcard `*` with credentials is explicitly rejected.
+  6. State-changing requests also pass through an `Origin`/`Referer` allowlist gate. This is required because CORS controls response access, not whether a browser sends a credentialed request. The gate preserves exact origin matching and parses `Referer` to its origin. If both headers are absent, the request is rejected; missing provenance is never treated as trusted server-to-server traffic. An empty `ALLOWED_ORIGINS` is also fail-closed and rejects every state-changing request until an explicit allowlist is configured.
 
 ---
 

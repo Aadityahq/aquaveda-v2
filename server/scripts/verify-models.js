@@ -218,6 +218,20 @@ check("3d. Issue does NOT reject out-of-range-but-structurally-valid coordinates
   );
 });
 
+check("3z. Issue locationLabel is optional, trimmed, length-bounded (#134)", () => {
+  assert.equal(issueDoc().validateSync(), undefined, "valid without a label");
+  const labelled = issueDoc({ locationLabel: "  Patna, Bihar  " });
+  assert.equal(labelled.validateSync(), undefined);
+  assert.equal(labelled.locationLabel, "Patna, Bihar");
+  const err = issueDoc({ locationLabel: "x".repeat(201) }).validateSync();
+  assert.ok(err?.errors?.locationLabel, "201 chars must be rejected");
+  assert.equal(
+    Issue.schema.indexes().some(([f]) => "locationLabel" in f),
+    false,
+    "label must not be indexed (display text, never a query key)",
+  );
+});
+
 // ---------------------------------------------------------------------
 // 4. Knowledge rejection requires non-empty feedback
 // ---------------------------------------------------------------------
@@ -358,8 +372,52 @@ function topLevelFields(schema) {
 }
 
 check("8a. User has exactly the expected top-level fields", () => {
-  const expected = ["name", "email", "passwordHash", "role", "bio"].sort();
+  const expected = [
+    "name",
+    "email",
+    "passwordHash",
+    "role",
+    "bio",
+    "expertApplication",
+  ].sort();
   assert.deepEqual(topLevelFields(User.schema), expected);
+});
+
+check("8a-3. expert application history entries may carry an OPTIONAL submission (legacy entries have none); acknowledgement facts are server-shaped", () => {
+  const entryPaths = User.schema.path("expertApplication.history").schema.paths;
+  assert.ok(entryPaths.submission, "history entry has a submission subdocument");
+  assert.equal(entryPaths.submission.isRequired, undefined, "submission must not be required (legacy entries)");
+  const subPaths = entryPaths.submission.schema.paths;
+  for (const f of ["expertiseAreas", "experience", "affiliation", "references", "acknowledgement"]) {
+    assert.ok(subPaths[f], `submission.${f}`);
+  }
+  const ackPaths = subPaths.acknowledgement.schema.paths;
+  for (const f of ["version", "textSha256", "acceptedAt"]) assert.ok(ackPaths[f], `acknowledgement.${f}`);
+});
+
+check("8a-2. User.expertApplication: absent by default; status enum; history entry shape", () => {
+  const u = new User({ name: "A", email: "a@example.test", passwordHash: "x" });
+  assert.equal(u.expertApplication, undefined, "absence === never applied");
+  const bad = new User({
+    name: "A",
+    email: "a@example.test",
+    passwordHash: "x",
+    expertApplication: { status: "verified", history: [] },
+  });
+  assert.ok(bad.validateSync()?.errors["expertApplication.status"], "unknown status rejected");
+  const ok = new User({
+    name: "A",
+    email: "a@example.test",
+    passwordHash: "x",
+    expertApplication: {
+      status: "pending",
+      history: [{ fromStatus: null, toStatus: "pending", actor: "507f1f77bcf86cd799439011" }],
+    },
+  });
+  assert.equal(ok.validateSync(), undefined);
+  assert.equal(ok.expertApplication.history[0].fromStatus, null);
+  const flat = ["reviewer", "verifiedBy", "approvedBy", "resolvedBy"];
+  for (const f of flat) assert.equal(User.schema.path(f), undefined, `no flat ${f}`);
 });
 
 check("8b. Issue has exactly the expected top-level fields", () => {
@@ -367,6 +425,7 @@ check("8b. Issue has exactly the expected top-level fields", () => {
     "title",
     "description",
     "location",
+    "locationLabel", // #134: optional reporter-supplied display text
     "severity",
     "category",
     "domain",

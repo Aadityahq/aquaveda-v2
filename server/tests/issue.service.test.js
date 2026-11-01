@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { Issue } from "../src/models/Issue.js";
 import { User } from "../src/models/User.js";
 import { createIssue, changeStatus, listIssues, getIssueById } from "../src/services/issue.service.js";
+import { ISSUE_CATEGORY_VALUES, ISSUE_SEVERITY_VALUES } from "../src/domain/issue-classification.js";
 import { DomainErrorCode } from "../src/services/errors.js";
 import {
   setupTestDb,
@@ -98,6 +99,58 @@ describe("issue.service — createIssue", () => {
     assert.equal(entry.toStatus, "open");
     assert.equal(String(entry.actor), reporter.id);
     assert.ok(entry.timestamp instanceof Date);
+  });
+
+  it("persists every canonical category and severity", async () => {
+    const reporter = fakeActor("USER");
+    for (const category of ISSUE_CATEGORY_VALUES) {
+      const issue = await createIssue(reporter, { title: "t", description: "d", location: validPoint(), category });
+      assert.equal(issue.category, category);
+    }
+    for (const severity of ISSUE_SEVERITY_VALUES) {
+      const issue = await createIssue(reporter, { title: "t", description: "d", location: validPoint(), severity });
+      assert.equal(issue.severity, severity);
+    }
+  });
+
+  it("normalizes a locationLabel and leaves it absent when omitted or blank (#134)", async () => {
+    const reporter = fakeActor("USER");
+    const base = { title: "t", description: "d", location: validPoint() };
+    const labelled = await createIssue(reporter, { ...base, locationLabel: "  Kankarbagh,\n Patna " });
+    assert.equal(labelled.locationLabel, "Kankarbagh, Patna");
+    for (const extra of [{}, { locationLabel: "   " }]) {
+      const issue = await createIssue(reporter, { ...base, ...extra });
+      assert.equal(issue.locationLabel, undefined);
+    }
+  });
+
+  it("enforces the same locationLabel contract as the schema even when bypassing Zod (#134)", async () => {
+    const reporter = fakeActor("USER");
+    const base = { title: "t", description: "d", location: validPoint() };
+    for (const bad of ["<b>x</b>", "x".repeat(201), 42, null, ["a"]]) {
+      await assert.rejects(
+        () => createIssue(reporter, { ...base, locationLabel: bad }),
+        (err) => err.code === DomainErrorCode.VALIDATION_FAILED,
+        `should reject ${JSON.stringify(bad)}`,
+      );
+    }
+    assert.equal(await Issue.countDocuments(), 0);
+  });
+
+  it("leaves category/severity empty when omitted", async () => {
+    const issue = await makeOpenIssue();
+    assert.equal(issue.category, "");
+    assert.equal(issue.severity, "");
+  });
+
+  it("rejects a non-canonical category/severity with VALIDATION_FAILED even when bypassing Zod", async () => {
+    const reporter = fakeActor("USER");
+    for (const extra of [{ category: "infrastructure" }, { severity: "urgent" }]) {
+      await assert.rejects(
+        createIssue(reporter, { title: "t", description: "d", location: validPoint(), ...extra }),
+        (err) => err.code === "VALIDATION_FAILED",
+      );
+    }
   });
 
   it("does not accept caller-supplied status or statusHistory", async () => {

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { connectDB, disconnectDB } from "../../src/config/db.js";
+import { assertTestDatabaseSeparation } from "../../src/config/env.js";
 import { Issue } from "../../src/models/Issue.js";
 import { Knowledge } from "../../src/models/Knowledge.js";
 import { Comment } from "../../src/models/Comment.js";
@@ -25,27 +26,41 @@ import { Session } from "../../src/models/Session.js";
  * never run against the development database. This is enforced below,
  * not just documented.
  *
- * Requires a running MongoDB instance and TEST_MONGO_URI set in the
- * environment before running (see server/README.md).
+ * When TEST_MONGO_URI is not set in the environment (e.g. a developer
+ * without a local MongoDB installation), MongoMemoryServer is used as a
+ * transparent substitute: it downloads a real mongod binary on first run
+ * (cached in ~/.cache/mongodb-binaries) and starts it in-process.
+ * TEST_MONGO_URI is then set to the ephemeral URI so the rest of this
+ * module's logic is unchanged — no test file needs to know or care.
  */
 
+/** Holds the MongoMemoryServer instance when we started it ourselves. */
+let _memoryServer = null;
+
 export async function setupTestDb() {
-  if (
-    process.env.TEST_MONGO_URI &&
-    process.env.MONGO_URI &&
-    process.env.TEST_MONGO_URI === process.env.MONGO_URI
-  ) {
-    throw new Error(
-      "TEST_MONGO_URI must not be the same as MONGO_URI — refusing to " +
-        "run tests against the development database."
-    );
+  if (!process.env.TEST_MONGO_URI) {
+    // No real MongoDB configured — start an in-process one.
+    // Dynamic import keeps the dev-only package out of the production
+    // bundle; mongodb-memory-server is listed in devDependencies only.
+    const { MongoMemoryServer } = await import("mongodb-memory-server");
+    _memoryServer = await MongoMemoryServer.create();
+    process.env.TEST_MONGO_URI = _memoryServer.getUri();
   }
+
+  assertTestDatabaseSeparation(process.env.TEST_MONGO_URI, process.env.MONGO_URI);
 
   await connectDB({ envVar: "TEST_MONGO_URI" });
 }
 
 export async function teardownTestDb() {
   await disconnectDB();
+
+  if (_memoryServer) {
+    await _memoryServer.stop();
+    _memoryServer = null;
+    // Remove the injected env var so it doesn't leak if the process is reused.
+    delete process.env.TEST_MONGO_URI;
+  }
 }
 
 export async function clearCollections() {

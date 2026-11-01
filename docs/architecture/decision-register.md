@@ -433,7 +433,7 @@ for the resolved values.
 | Item | Note |
 |---|---|
 | User suspension/deactivation | No current requirement; adding a status field now would be speculative |
-| Expert role acquisition mechanism | Belongs to the Authentication/Governance milestone — `role: EXPERT` as a fact is established, the assignment *process* is not |
+| Expert role acquisition mechanism | **Resolved by #91** — see "🔒 Locked — Expert Authority (#91)". ADMIN provisioning remains #89 |
 | Comment deletion (soft/hard) | No v1 precedent, no current requirement |
 | Project status field | Explicitly decided against for V2; revisit only if the Act milestone proves a need |
 | Leaving a project | No v1 precedent, no current requirement |
@@ -443,7 +443,7 @@ for the resolved values.
 
 ## 🔧 Implementation detail (resolved when the relevant schema is written, no ADR needed)
 
-- Issue `category`: enum vs. freeform representation.
+- Issue `category`/`severity`: **resolved (Issue #67)** — optional, canonical enum vocabularies defined in `server/src/domain/issue-classification.js`; see `domain-model.md` (Issue → Classification).
 
 ## 🟢 Established (already correct, not reopened)
 
@@ -461,6 +461,10 @@ for the resolved values.
 ## 🟡 The only unresolved domain dependency
 
 **D-3a — Remediation-assertion authority.**
+
+> **RESOLVED 2026-11-01 by ADR-0007** (explicit, EXPERT-issued, grantee-accepted, issue-scoped
+> grant). The text below is retained as the historical record of the deferral; see
+> "Locked — Remediation authorization" at the end of this register.
 
 The Issue lifecycle (ADR-0003) requires `acknowledged → in_progress` and
 `in_progress → resolved` to be performed by an "authorized remediation
@@ -737,6 +741,124 @@ Restated below only as locked conclusions, resolving
   criteria; implementation review in
   `docs/architecture/checkpoint-issue-48-implementation-notes.md`.
 
+  **Amended (Issue #74, authenticated Knowledge workflow reads):** 3
+  authenticated GET routes added to Knowledge (now 5 write + 2 public
+  read + 3 workflow read = 10; domain routes total 19):
+  `GET /api/v1/knowledge/mine`, `GET /api/v1/knowledge/review-queue`,
+  `GET /api/v1/knowledge/:knowledgeId/workflow`. Justification: #51's
+  review lifecycle (submit/approve/reject/revise) had no reachable
+  target — the public reads are approved-only by design, so a reviewer
+  could not discover or read a `pending_review` article, and an author
+  could not find their own draft/pending/rejected articles without
+  remembering an internal ID. Read-only; no lifecycle state, role,
+  permission, schema field, or index is added; D-3a untouched. The
+  decisions below are locked with this amendment.
+
+- **ROUTE-L2a — Workflow authorization (Issue #74).** All three routes
+  call `requireActor` in the service (401 when unauthenticated).
+  `GET /mine`: the owner filter is `actorContext.id` only — no
+  caller-supplied author is accepted (an `?author=` param is ignored).
+  `GET /review-queue`: `requireRole(actor, "EXPERT")` — the same exact
+  single-role rule as `approve`/`reject` (AUTH-L2); ADMIN is forbidden
+  (403), consistent with the locked EXPERT-only, not EXPERT-or-ADMIN,
+  review authority. `GET /:knowledgeId/workflow`: readable iff the
+  caller is the article's author, or is an EXPERT and the article is
+  `pending_review`. Every other case — including a nonexistent id — is
+  the same `NOT_FOUND` (never `FORBIDDEN`), for the reason
+  `getApprovedKnowledgeById` documents: a distinguishing error would
+  confirm that a specific non-public article exists. Authorization is
+  decided on the raw document before any population. A malformed id is
+  `VALIDATION_FAILED` (400).
+
+- **ROUTE-L2b — Review queue excludes the caller's own submissions
+  (Issue #74, decision 1).** Chosen: exclude (`author != actor.id`).
+  Reason: `approve`/`reject` already hard-forbid `reviewerId ===
+  authorId`, so an own-authored item in the queue could only yield an
+  item whose every action fails. This is derived from the existing
+  invariant, not a new rule. Rejected alternative: include and let the
+  action return 403 — worse UX, and it would push the self-review check
+  into the frontend. Consequence: an EXPERT's own pending article is
+  reachable through `/mine` and `/:knowledgeId/workflow` (author rule),
+  not the queue.
+
+- **ROUTE-L2c — List items are summaries; the detail read carries the
+  body (Issue #74, decision 2).** Chosen: `/mine` and `/review-queue`
+  return `{_id, title, region, status, author, createdAt, updatedAt}`
+  — no `body`, no `reviewHistory`. Only `/:knowledgeId/workflow` returns
+  `body` and `reviewHistory`. Reason: article bodies are unbounded, and a
+  50-item page of full bodies is the largest payload in the API; the
+  detail route is required regardless (a reviewer must read the article
+  before deciding), so bodies in lists would be a second source of the
+  same data. Deliberate refinement of #74's draft text, which allowed
+  either shape.
+
+- **ROUTE-L2d — Separate workflow DTO; public DTO untouched (Issue
+  #74).** `server/src/services/knowledge.dto.js` maps lean documents by
+  explicit allow-list (never the Mongoose document; no `__v`). Actors
+  are `{_id, name, role}` only, for `author` and, on the detail shape,
+  `reviewHistory[].reviewer` (populated) plus `feedback`. A reference
+  that no longer resolves maps to `null`. The public #48 reads still
+  return the existing shape (author populated, `reviewer` an
+  unpopulated id) — locked by regression tests. `/mine` and
+  `/review-queue` are registered before the public `/:knowledgeId`
+  (route-order regression test). Query validation: `/mine` accepts an
+  optional `status` enum of the four existing states plus
+  `paginationQuerySchema`; `/review-queue` accepts pagination only.
+  Ordering: `/mine` by `updatedAt` desc; `/review-queue` by `updatedAt`
+  asc (oldest first) — no `submittedAt` field is added because content
+  is immutable while `pending_review`, so `updatedAt` equals submission
+  time for every queue item; `_id` breaks ties. No new index: the
+  existing `{status}` and `{author}` indexes serve both queries
+  (`persistence-design.md`: approved indexes only).
+
+- **Known finding, out of scope for #74:** the *public* Knowledge detail
+  returns `reviewHistory`, including rejection `feedback` and
+  unpopulated reviewer ids, for an article that was rejected and later
+  approved. Not changed here (the public contract is locked by #74). A
+  narrower public DTO is a candidate follow-up.
+
+- **ROUTE-L2e — Public Issue discovery extends `GET /api/v1/issues`
+  (Issue #41).** No new endpoint and no new route count: the existing
+  public list gains optional, combinable parameters `category`,
+  `severity`, `q` (text) and `bbox`. Anonymous, read-only, no new
+  fields, canonical envelopes unchanged; a request without the new
+  parameters behaves exactly as before. Full contract (parameters,
+  bounds, ordering, MongoDB strategy, exclusions):
+  `docs/architecture/issue-discovery-contract.md`. Locked decisions:
+  (a) **one geographic representation**, `bbox=west,south,east,north`
+  (longitude first, edges inclusive, west < east, ±85° latitude, ≤10°
+  per axis, 400 not clamp); radius/`$near` is deliberately out because
+  it forces distance ordering and breaks counted stable pagination, and
+  a "near me" client can compute a bbox; (b) **ordering is always
+  `createdAt` desc then `_id` desc** (the `_id` tiebreaker is new and
+  backward compatible); (c) **`q`: indexed `$text` candidates + per-term whole-word
+  verification.** Every term is required as a whole word in title or
+  description; case-insensitive, diacritics significant, no stemming,
+  query syntax neutralised (quotes separate terms, metacharacters are
+  literal). `$text` alone is insufficient: quoted-phrase matching is a
+  substring test over an OR-selected candidate set, so a term matched
+  inside a longer word ("main" in "maintenance") whenever another term
+  supplied the candidate — found by probing a real `mongod` and fixed in
+  review. The regex check runs only on index candidates, so the endpoint
+  stays index-bound (an unindexed regex scan was rejected for a public
+  anonymous endpoint). Consequence, locked: a term with no letter or
+  digit has no index token, so it cannot locate documents itself — a
+  query of only such terms is accepted and empty; alongside a searchable
+  term it is still required and checked literally on that term's
+  candidates (narrows, never widens, never dropped). Clients strip
+  standalone punctuation. This adds the `issue_text_search` index
+  (persistence-design amended accordingly); (d) **`bbox` is a
+  `$centerSphere` candidate circle that strictly encloses the box, plus
+  exact planar bounds**: verified against a real `mongod` that a GeoJSON
+  `$geometry` polygon from the corners is wrong at the edges (great-circle
+  arcs) and that `$box` is a collection scan on a 2dsphere index;
+  (e) `category` and `severity` are exact matches on the canonical
+  vocabularies; unclassified (`""`) is not filterable and no semantics
+  are invented; (f) service-layer re-validation of the new parameters
+  against the same definitions (`domain/issue-search.js`), because
+  services are also called directly. Issue lifecycle, authentication
+  and D-3a are untouched.
+
 - **ROUTE-L3 — No route-level "must be authenticated" gate.** Confirmed
   by direct inspection (discovery report §0/§2a): all 9 domain-service
   operations already call `requireActor()` as their first line. A
@@ -801,3 +923,185 @@ Restated below only as locked conclusions, resolving
 route, D-3a resolution in any form (ROUTE-L4 changes only its HTTP
 *representation*, not the underlying unresolved policy), any change to
 `authMiddleware`'s advisory (non-rejecting) behavior.
+
+---
+
+## 🔒 Locked — Expert Authority (#91)
+
+Status: implemented and merged (#98); later extended by EXP-L9–L20 (#124). The offline counts recorded at the time (verify:models 45/45, verify:validation 85/85) are point-in-time, not current. DB-backed tests run against `mongo:7` in CI (#84); no pass count is recorded here.
+
+| ID | Decision |
+|---|---|
+| EXP-L1 | Expert acquisition is a **governance** act: `USER → apply → ADMIN approval → EXPERT`. Reviewer authority = `requireRole(ctx, "ADMIN")`. Never `ADMIN \|\| EXPERT` (AUTH-L2); EXPERT does not decide who becomes EXPERT (self-perpetuating reviewer class). Resolves the D-2 deferral. ADMIN provisioning stays #89. |
+| EXP-L2 | Persistence: embedded `User.expertApplication { status, history[] }`; absence = never applied. No new collection, no flat `reviewer`/`verifiedBy` (ADR-0005). |
+| EXP-L3 | Lifecycle: `none→pending`, `pending→approved`, `pending→rejected`, `rejected→pending` (re-apply, same object, append-only history). `approved` terminal. Every transition, including `null→pending`, is a history entry `{fromStatus,toStatus,actor,note?,timestamp}`. |
+| EXP-L4 | Approval is one conditional atomic write on `{_id, role:"USER", "expertApplication.status":"pending"}` setting `role:"EXPERT"` + status + `$push` history (ADR-0006). Invariant `role==="EXPERT" ⇔ status==="approved"` holds for applied users; no transaction. Losers get `STATE_RACE`. |
+| EXP-L5 | Client never supplies role, status, applicant, or reviewer. Applicant = actor; reviewer = actor; bodies are `.strict()`. Only USER may apply (stored role authoritative). Reviewer cannot decide own application. |
+| EXP-L6 | Contract (`/api/v1/expert-application`): `POST /` apply, `GET /me` own status (`none` if absent; no reviewer identity), `GET /` pending queue (ADMIN), `POST /:userId/approve`, `POST /:userId/reject {note?}` (ADMIN). Queue oldest-first by `updatedAt`; excludes email. |
+| EXP-L7 | Role takes effect immediately: `authMiddleware` reads role fresh from DB per request (L11); no session revocation needed. |
+| EXP-L8 | Dev/test provisioning: `tests/helpers/expert.js` drives the real apply+approve services with a fixture ADMIN (direct write, because #89 owns ADMIN provisioning). No HTTP endpoint, not importable from `src/`. |
+
+Deferred: frontend applicant/admin surfaces; ADMIN provisioning CLI (#89); notifications; application motivation/evidence fields; expert profiles. Dependency chain: #89 → #91 → #90.
+
+---
+
+## 🔒 Locked — Knowledge Moderation Workflow (#90)
+
+Status: implemented. Offline checks pass; DB-backed suites (incl. `knowledge.moderation.test.js`) - pass.
+
+| ID | Decision |
+|---|---|
+| MOD-L1 | Lifecycle unchanged (ADR-0004): `draft → pending_review → approved \| rejected → draft`. #90's "create → pending" is create (draft) + submit (pending_review); no state added. Authority unchanged: EXPERT-only review, `reviewer ≠ author`, ADMIN has no Knowledge review authority. |
+| MOD-L2 | **Finding:** the public reads (`GET /knowledge`, `GET /knowledge/:id`) returned the raw document, exposing `reviewHistory[].feedback` from earlier rejection cycles of later-approved articles. Moderation feedback is private to the author and EXPERT reviewers. Fixed at the route layer with `toPublicKnowledgeDTO` (same public shape minus `feedback` and storage internals; reviewer stays an unpopulated id). Service return types unchanged. |
+| MOD-L3 | Test fixtures acquire EXPERT only through the real #91 lifecycle (`promoteToExpertViaLifecycle`); the end-to-end suite does it over HTTP. ADMIN fixtures remain direct writes until #89. |
+
+---
+
+## 🔒 Locked — Local ADMIN Provisioning (#89)
+
+Status: implemented. Offline checks pass; DB-backed suite (`provision-admin.test.js`) pass.
+
+| ID | Decision |
+|---|---|
+| ADM-L1 | Mechanism: `npm run provision:admin` (`server/scripts/provision-admin.js`, logic in `provision-admin-lib.js`). Lives under `scripts/`, never imported by `src/`, no HTTP surface. The stale `seed:users` script (pointing at a nonexistent `src/seed/seedUsers.js`) was removed: a generic user seeder is exactly the broad elevation tool this decision avoids. |
+| ADM-L2 | Fail-closed boundary, all required, checked before any DB connection: `NODE_ENV !== production`; `ALLOW_DEV_ADMIN_PROVISIONING === "true"`; `MONGO_URI` loopback host AND database ending `_dev`. No bypass. `NODE_ENV` alone is never proof. **`MONGO_URI` is the only database setting**: the validated string is carried in the resolved config and `connectDB({ uri })` (new explicit-URI option; env lookup bypassed) connects to exactly that string, so the checked target and the used target cannot differ (an earlier revision validated a separate `DEV_MONGO_URI` while connecting via `MONGO_URI` — fixed in the #103 review; covered by mutation-checked wiring tests). Shared host/suffix guard extracted to `scripts/local-db-guard.js` (E2E guard now delegates; its `_e2e` behavior unchanged). Consequence: the dev database must be named `*_dev`. |
+| ADM-L3 | One explicit identity (`ADMIN_BOOTSTRAP_EMAIL`), validated by the registration schema, hashed by the production `hashPassword`. Created directly (no session/tokens). Existing ADMIN → no-op (password never overwritten; mismatch only reported). Existing USER/EXPERT with that email → refused, untouched. No credentials in the repo; output never contains password, hash or tokens. |
+| ADM-L4 | Authority unchanged: ADMIN governs (EXP-L1) and has no Knowledge review authority (#90). The provisioned account authenticates through the normal login path and is recognized by `authMiddleware`'s fresh role read. |
+
+Deferred: production/staging ADMIN bootstrap (out of scope; needs its own decision), ADMIN credential rotation.
+
+---
+
+## 🔒 Locked — Production Bootstrap Credential Input (#110)
+
+Status: merged (PR #117); BSC-L4 resolved by #118. Builds on #102 (bootstrap CLI) and #109 (target validation, unchanged).
+
+| ID | Decision |
+|---|---|
+| BSC-L1 | The ADMIN password is accepted only from (a) `ADMIN_PASSWORD`/`ADMIN_BOOTSTRAP_PASSWORD` via platform secret injection or (b) a hidden TTY prompt entered twice, unmodified (no trim). `--password` is **removed** and refused before any other processing, even with an env password present. No echoing fallback exists: no TTY and no env password → refusal. Rejected alternative: keep `--password` with a documentation warning (a documented footgun is still a footgun; argv is exposed via process listings and history). |
+| BSC-L2 | Hidden input is `scripts/secret-prompt.js` (raw mode, no echo, no mask). Terminal state is restored on submit, Ctrl+C/Ctrl+D, stream error/end, external SIGINT/SIGTERM/SIGHUP, and synchronously on process `exit`. Signal contract: restore, reject, then **re-raise the same signal** so default termination semantics hold (the prompt runs before any DB connection, so nothing needs graceful teardown). Keyboard Ctrl+C is a raw byte and only rejects. `PromptAborted` carries fixed message strings only; stream error details are discarded. |
+| BSC-L3 | Operator-facing failures: `BootstrapRefusal` text is authored by the tool; any other error prints only `safeErrorTag()` (allowlisted `name`/safe-integer-or-token `code`, else fixed `Error`), never `.message`. One shared formatter (`src/config/safe-error.js`) serves the CLI and the `connectDB({ redactErrors: true })` listener (`logConnectionError`). Application runtime logging is unchanged (`redactErrors` defaults off). Triggering finding: an unreachable target previously printed the cluster hostname in two places. |
+| BSC-L4 | **Resolved in #118:** the connection string is read only from `MONGO_URI`. `--mongo-uri` is removed. Any argv token that names a connection string (`--mongo-uri` in any spelling/case/dash/underscore form, `--uri`, `--mongo-url`, ...), with or without a value, or that looks like one (starts with `mongodb://` / `mongodb+srv://`, positional or as another flag's value) is refused by `hasCommandLineConnectionString()` immediately after the existing `--password` refusal, i.e. before the production-intent, confirmation, target and connection steps and before `MONGO_URI` is read, so there is no environment fallback and no prompt. The refusal text is fixed and never echoes argv. #109 is otherwise unchanged: expected-DB gate, TLS/loopback/dev-name rules, exact validated string passed to `connectDB({ uri })`; `--expect-db` keeps flag-over-env semantics. Rejected alternative: keep the flag but refuse credential-bearing values (still trains operators to put URIs in argv and cannot detect credentials delivered by other means). Residual: `MONGO_URI` in the process environment (documented in runbook §4.4). |
+
+---
+
+## 🔒 Locked — Bootstrap CLI Orchestration and Cleanup (#111)
+
+Status: merged (PR #119). Builds on #102/#109/#110 (all behavior unchanged).
+
+| ID | Decision |
+|---|---|
+| BCO-L1 | Orchestration is `runCli()` in `scripts/bootstrap-admin.js`: config → connect → bootstrap/report → cleanup, with every boundary injectable (`connect`, `bootstrap`, `prompt`, `promptSecret`, `disconnect`, log sinks). It returns the exit code and never touches `process`; `main()` wires TTY prompts and sets `process.exitCode`. Rejected alternative: module mocking (brittle against ESM; the injection seams already existed in `runBootstrap`). |
+| BCO-L2 | Cleanup is attempted and awaited exactly once whenever a connection attempt began (including a rejecting or synchronously throwing `connect`); not called when the run was refused before any attempt. Replaces `main().catch(...).finally(() => disconnectDB())`, whose rejection was unhandled (raw, unsanitized output; could mask the primary error). |
+| BCO-L3 | Cleanup failure never replaces the primary error (primary printed first, cleanup as an additional line). A cleanup failure after a successful operation exits `1` with an explicit "completed, not rolled back, safe to re-run" message: failing visibly beats a silent resource-release failure in ops tooling, and re-running is idempotent. All failure lines use `describeFailure` (BSC-L3). |
+| BCO-L4 | Tests: `tests/bootstrap-cli.test.js` (in-process via DI plus a subprocess harness running the real `main()` with fake dependencies; no database reachable by construction). |
+
+---
+
+## 🔒 Locked — Expert Application Details (backend; frontend pending)
+
+Design: `docs/architecture/expert-application-details-design.md`. Status: **backend and frontend implemented.** Extends EXP-L1–L8. Backend verified on real MongoDB in CI (1132/1133 then fixed); the frontend suite, lint and typecheck pass in the authoring sandbox, the production build compiles with the Google Fonts fetch stubbed (the sandbox blocks it), and the governance E2E has not been run there (it needs Playwright, MongoDB and a running stack): it is a merge gate.
+
+| ID | Decision |
+|---|---|
+| EXP-L9 | Apply carries a strict submission `{ expertiseAreas (1-3, fixed vocabulary), experience (80-1000 trimmed), affiliation? (<=120), references? (<=3, https, no userinfo, normalized + de-duplicated), acknowledgement: { version } }`. The empty-body contract is gone (breaking). Stored on the `-> pending` history entry as `submission` (additive, not `required` in Mongoose, no migration, legacy entries have none, ADR-0005). Each attempt keeps its own submission. The server never fetches submitted URLs. |
+| EXP-L10 | Acknowledgement (v1 wording settled: accuracy declaration + Expert-conduct commitment, so it now also attests the submission is truthful; unreleased, so re-pinned before release, frozen from first release, changes add a version): client sends only `version`; the service stores `{ version, textSha256, acceptedAt }`, hash computed server-side from the immutable text for that version (`ACKNOWLEDGEMENT_TEXTS`). A shipped text is never edited (add a version); CI pins each digest. The hash proves integrity against the retained canonical text, not what a browser rendered. |
+| EXP-L11 | Revision pinning: approve/reject require `revision` (= `history.length` the reviewer saw, integer 1..10 000). The decision is ONE atomic conditional write whose predicate (`decisionFilter`) holds role `USER`, status `pending` and `history: { $size: revision }`; a stale or lost write is a 409, never success, never retried: `STATE_RACE` when the application is still pending but its revision differs (or the atomic write matched nothing), `INVALID_STATE` when it is no longer pending (status is checked first). `revision` is 1..10 000; the 16 MiB document limit is reached long before, and an application beyond the bound is undecidable via the API (operator repair). Reviewer DTO `revision` and `submission` come from the same history array of one read. Rejected alternative: status-only guard (lets an admin approve a re-application they never saw). |
+| EXP-L12 | Decision notes (trim, then validate): reject note REQUIRED 10-500; approve note optional, when present 1-500. Enforced in request/service validation, not as a Mongoose constraint, so historical entries stay readable. |
+| EXP-L13 | One pure, import-free domain module `server/src/domain/expert-application-submission.js` holds vocabulary, limits, wording and validation; Zod only adapts it (so they cannot drift). The frontend may import it through a single re-export file (same precedent as `issue-search.js`; ADR-0002 constrains what `server/` imports, not who consumes its pure modules; the build context must include `server/src/domain/`). A test enforces zero imports. |
+| EXP-L14 | `POST /expert-application` reuses the existing IP-keyed in-memory `createRateLimiter` (10/hour/IP; per-instance). Re-apply cooldown deferred. Worst-case history growth (~13 KB per full cycle, estimate) is not domain-bounded; revisit at >50 attempts per user. |
+| EXP-L16 | Frontend contract boundary: `src/lib/expert/submission-contract.ts` is the ONLY place the frontend reaches `server/src/domain/expert-application-submission.js` (typed re-exports; a test asserts identity with the backend values). The form, decision notes and acknowledgement all use the shared validators and wording; nothing in `src/` restates a limit or rule. The production build bundles it (verified). |
+| EXP-L17 | `ExpertStatusProvider` (under `AuthProvider`) is the sole fetcher of Expert status: USER `GET /me`, ADMIN queue `limit=1` reading `total`, others nothing. Keyed `userId:role`; identity/role change hides old data and drops late responses; one in-flight read per key (Strict Mode safe); explicit `refresh()`/`setApplication()` supersede older in-flight reads; refresh on identity change, own mutations and tab-visible after 60 s; no polling. Failure: no data = error, prior data = kept but `stale`; stale or missing data is never shown as current (nav chip drops). |
+| EXP-L18 | `AuthProvider.refreshUser()` re-reads `/auth/me` (fresh role, EXP-L7) into provider state without token rotation or reload; failed or superseded reads resolve `null` and change nothing. **Supersedes UI-L4** (the status page no longer tells the user to reload; on an approved application it activates Expert tools once and offers a retry). |
+| EXP-L19 | Applicant UI: the form shows the contract's acknowledgement text verbatim beside its checkbox under "By submitting this application you agree to:", never pre-accepted (also not on re-apply prefill). Pending shows the read-only submission (legacy: an explicit "submitted before details were collected" message), and the timeline follows the persisted history (Submitted, Approved/Not approved dated; "Awaiting review" is the current state with no invented date; no review-time promise). Apply re-reads the real state on a stale refusal. |
+| EXP-L20 | Admin UI: master-detail queue; the detail shows the full submission (plain text only; references only as safe hostname links), a Re-application block with earlier attempts and notes, and a legacy marker (still decidable). Every decision sends the `revision` shown; reject requires a note (button disabled with a visible reason), approve's note is optional; `STATE_RACE`/`INVALID_STATE` re-read the queue and show a recoverable message; the decision component is keyed by `userId:revision` so a new snapshot resets it. After a decision the queue and the nav count refresh and focus moves to the next application (or the outcome message). Knowledge review (`/learn/review`, EXPERT-only) stays separate: the queue never links to it, and ADMIN never gets it. |
+| EXP-L15 | Taxonomy values are **provisional** pending domain review; they are stable keys, changing them before release needs no migration (no stored data) and after release needs a migration decision. Deploy assumption: pre-release, no compatibility shim (backend first; old clients fail closed with 400). To confirm. |
+
+---
+
+## 🔒 Locked — Role-Aware Expert UI (frontend over #91)
+
+Status: implemented; frontend suite 569/569, typecheck/lint clean, build verified with mocked Google Fonts (real build blocked only by sandbox network). No backend change. Browser smoke (Playwright) not run.
+
+| ID | Decision |
+|---|---|
+| UI-L1 | Entry points are discoverable per role but never authoritative: USER → "Become an Expert" (`/learn/expert-application`: apply + status); EXPERT → "Review queue" (`/learn/review`, existing Knowledge moderation, unchanged); ADMIN → "Expert applications" (`/admin/expert-applications`, governance). Shown in the desktop navbar, mobile drawer and (USER/EXPERT) the Learn workflow links via one pure helper (`lib/expert/role-links.ts`); unknown/missing roles get nothing (no default-allow). ADMIN is never shown the Knowledge review entry. |
+| UI-L2 | **Superseded by EXP-L9/L11/L12** (apply now carries a strict submission; approve/reject carry `{ revision, note }`, reject note required). Original decision: the UI sends only what the #91 contract defined: apply = empty POST (applicant is the session); approve = POST by the named pending applicant; reject = optional `note` (≤500). No role, status, applicant or reviewer field exists in any request. Role grant is the backend's atomic write; the UI changes no role. |
+| UI-L3 | Backend refusals are rendered, not pre-empted: non-ADMIN visiting `/admin/expert-applications` sees the backend 403; non-USER apply → 403 message; duplicate/pending/stale decisions (`INVALID_STATE`, `STATE_RACE`, `NOT_FOUND`) explain and refresh the view. In-flight guards prevent duplicate submissions. Approval requires an explicit confirm step. |
+| UI-L4 | **Superseded by EXP-L18.** The session role is read at sign-in/`/auth/me`; after an applicant is approved their open session shows the old role until reload. The status page says so and offers Reload (no auth-provider change). |
+| UI-L5 | No `/dashboard` exists (it and `/community` remain deferred routes); the Expert entries live in navigation and the Learn area rather than a new dashboard. |
+
+---
+
+## 🔒 Locked — Configuration Hygiene & Secret Boundaries (#30)
+
+Status: implemented, reviewed, and verified.
+
+| ID | Decision |
+|---|---|
+| SEC-L1 | **Canonical startup configuration validation:** `server/src/config/env.js` is the single source of truth for environment validation. `server.js` calls `validateStartupConfig()` at boot time before connecting to MongoDB or starting HTTP listeners, failing fast with clear messages if required variables (`MONGO_URI`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`) are missing or invalid. |
+| SEC-L2 | **Cryptographic key separation:** `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` must be distinct cryptographic keys. Access vs. refresh secret equality (`JWT_ACCESS_SECRET === JWT_REFRESH_SECRET`) is blocked at startup and point-of-use (`getAccessSecret()`, `getRefreshSecret()`), preserving token confusion defense-in-depth. |
+| SEC-L3 | **Production security hygiene:** When `NODE_ENV === "production"`, JWT secrets must be at least 32 characters in length (256-bit entropy), must not contain predictable placeholder patterns (`test-`, `secret`, `changeme`, etc.), and `ALLOWED_ORIGINS` must be explicitly configured without wildcards (`*`). |
+| SEC-L4 | **Token lifetime validation & ordering:** `JWT_ACCESS_EXPIRES` and `JWT_REFRESH_EXPIRES` are strictly validated at startup. Durations must be positive integer + unit (`s/m/h/d`), and access token lifetime must be strictly less than refresh token lifetime (`JWT_ACCESS_EXPIRES < JWT_REFRESH_EXPIRES`). |
+| SEC-L5 | **Database separation protection:** `testDb.js`'s test database protection is strengthened via `assertTestDatabaseSeparation()`. In addition to verbatim string equality, canonical URI comparison (`isSameMongoDatabase`) normalizes loopback aliases (`localhost`, `127.0.0.1`, `::1`), default ports, and query parameters to prevent tests from wiping development databases. Tests targeting any database ending in `_dev` are strictly refused. |
+| SEC-L6 | **Repository and logging hygiene:** Version control explicitly ignores private keys and certificates (`*.key`, `*.cert`, `*.crt`, `*.pfx`, `*.p12`) while unblocking `.env.example`. HTTP request logging (`requestLogger`) restricts logs to `{method, path, status, durationMs}`, logging no bodies, query strings, headers, or cookies. |
+
+---
+
+## 🔒 Locked — Human-readable locations (#134)
+
+Status: implemented; backend `npm test` 1227/1227 against real MongoDB, `verify:models` 47/47, `verify:validation` 86/86, frontend 810/810, typecheck clean. Provider choice for production is **open** (see `geocoding-provider-comparison.md`).
+
+| ID | Decision |
+|---|---|
+| LOC-L1 | Issue ID is displayed and copyable on every card/detail for every status, independent of `isProjectEligible` (which still gates only project-creation wording/behavior). |
+| LOC-L2 | `Issue.locationLabel` is optional, trimmed, <= 200 chars, no index, no migration. Pure contract in `server/src/domain/location-label.js` (re-exported to the frontend via `src/lib/issues/location-contract.ts`). Normalization (NFC, whitespace collapse, control/bidi/zero-width removal); `<`/`>` rejected; blank = absent. `POST /api/v1/issues` accepts it additively. |
+| LOC-L3 | The label is **untrusted display text**: never geometry, never used for authorization, eligibility, search or geo filters; rendered only as a React text node; never presented as a verified address. Canonical coordinates remain the only authoritative location. |
+| LOC-L4 | Labels are persisted at report time; nothing is resolved at read time (zero provider calls on Explore). Missing label => "Location not named". Legacy issues unaffected. |
+| LOC-L5 | **No reverse geocoding.** GPS and manual-coordinate reports are unlabeled. Exact or rounded device coordinates are never sent to a provider; only user-typed query text leaves the server. |
+| LOC-L6 | `GET /api/v1/geocode/search?q=` (authenticated, per-IP limited 20/min, `q` 3..200, submit-driven). Adapter: identifying User-Agent, app-wide spacing (default 1.1 s), bounded wait queue (429 when full), TTL+LRU cache with in-flight de-duplication, 4 s timeout, all upstream failures => 503 `GEOCODER_UNAVAILABLE` with no provider detail, query text never logged. Per-process cache/throttle (same limitation as the rate limiter). |
+| LOC-L7 | Provider config lives in `config/env.js` (`resolveGeocoderConfig`, validated at startup). Public OSMF Nominatim is development-only; production without `GEOCODER_BASE_URL` disables the feature; production + public OSMF host fails startup; production requires `GEOCODER_USER_AGENT`. Attribution text/URL configurable and returned with results. |
+| LOC-L8 | Report form: place search primary; "Use my current location" kept; manual lat/lng collapsed under "Enter coordinates" (auto-expanded on invalid typed coordinates). A chosen place sets coordinates + label together; any other change to coordinates (manual edit, GPS) clears the label so it can never describe different coordinates. Provider failure never blocks reporting. |
+| LOC-L9 | New `DomainErrorCode.GEOCODER_UNAVAILABLE` (503). One new route (`/api/v1/geocode/search`); route-count lock amended for it. |
+| LOC-L10 | (Review pass) The label contract is enforced identically at the schema **and** `createIssue()` (same `domain/location-label.js` rules; non-string, markup and over-length labels are `VALIDATION_FAILED` for direct service callers too). Place-search submit respects the loading state (Enter == Search button). The report form discloses that search text is sent to a third-party service and device location is not. |
+
+---
+
+## 🔒 Locked — HTTP security headers (#129)
+
+Full rationale/ownership: `docs/architecture/http-security-headers.md`.
+
+| ID | Decision |
+|---|---|
+| HDR-L1 | Web headers are set once in `next.config.ts` `headers()` (source `/:path*`) from `src/lib/security-headers.ts`; API headers are set by `middleware/security-headers.js`, mounted first in `createApp()`. No path is covered by both. `X-Powered-By` removed on both. |
+| HDR-L2 | Values: `nosniff`; `X-Frame-Options: DENY`; web `Referrer-Policy: strict-origin-when-cross-origin` (**never** `no-referrer`/`same-origin`: OSM tiles require a Referer), API `no-referrer`; `Permissions-Policy` deny-list with only `geolocation=(self)` on web. |
+| HDR-L3 | HSTS is hosting-owned and not set by the app; CSP is a separate compatibility decision (findings recorded). Production headers are unverified until the deployed-URL checklist is run. |
+| HDR-L4 | No `helmet` dependency (its defaults would each need to be disabled/analyzed). Revisit if the header set grows. |
+## 🔒 Locked — Authentication security audit (#27)
+
+Full report: `docs/architecture/authentication-security-audit-27.md`. Release assessment: CONDITIONAL PASS.
+
+| ID | Decision |
+|---|---|
+| AUD-L1 | Rate-limit client identity trusts forwarded headers only through `TRUSTED_PROXY_HOPS` (Nth entry from the right; `X-Real-IP` never). Default 0 outside production; production startup requires an explicit value. Supersedes the "first `X-Forwarded-For` entry" rule of #42. |
+| AUD-L2 | The limiter's reaper evicts a key only when `newest hit + that key's window` has passed; live counters are never evicted. |
+| AUD-L3 | No change to JWT/Session architecture, cookies, CORS/CSRF, D-3a or L14/L17 (reuse detection and access-token-after-logout remain accepted trade-offs). F-03…F-07 are documented, not implemented. |
+
+---
+
+## 🔒 Locked — Remediation authorization (ADR-0007, resolves D-3a)
+
+Full decision: `docs/adr/ADR-0007-remediation-authorization.md` (revised 2026-11-01 after review). Design only; no code yet.
+
+| ID | Decision |
+|---|---|
+| REM-L1 | Remediation authority = an explicit **issue-scoped grant**, embedded as `Issue.remediation {grantId, actor, grantedBy, grantedAt, acceptedAt}`; single assignee; absent = unassigned. Never a role, never Project membership, never inferred from ownership/ADMIN. `acceptedAt`: null = pending, timestamp = accepted, once; removal keeps the history event. |
+| REM-L2 | EXPERT grants/withdraws; only the grantee accepts/declines/releases; ADMIN may only revoke (note required). Allowed only in `acknowledged`/`in_progress`. Volunteering is not stored and confers nothing. |
+| REM-L3 | `acknowledged → in_progress` and `in_progress → resolved` require the **accepted** grantee; nobody else, of any role. Verify/reject rules unchanged (EXPERT, resolver ≠ verifier); failed verification keeps the grant. |
+| REM-L4 | Every grant-dependent write filters on the exact `grantId` read in the pre-read (atomic, extends ADR-0006; prevents ABA replacement races). Zero-match ⇒ `NOT_FOUND`/`STATE_RACE`, never `FORBIDDEN`; the pre-read may return `FORBIDDEN` for demonstrable unauthorization. Not idempotent. |
+| REM-L5 | New embedded append-only `remediationHistory[]` typed events (separate from `statusHistory`); `statusHistory` gains optional `note` (≤2000, plain text, untrusted, non-empty when required: resolve/verify/reject/withdraw/revoke). A note has the audience of its own history. |
+| REM-L6 | Visibility by two independent rules, enforced in server DTOs: **role-based** (current EXPERT/ADMIN read workflow records, evaluated per request, so promotion/demotion changes it) and **participation-based** (other users read only events where they are performer/grantee, unaffected by role changes). Public sees `statusHistory`(+notes), the accepted assignee and the public activity log. Withdraw/revoke notes are role-based only; raw arrays are never returned. |
+| REM-L7 | `AUTHORIZATION_POLICY_UNRESOLVED` no longer emitted (enum retained pending cleanup). No new error codes. Additive schema, no migration, no index until the "my assignments" query exists. |
+| REM-L8 | **Adaptive self-grant:** an EXPERT may grant themselves iff `expertCount < SELF_GRANT_EXPERT_THRESHOLD` (default 5, `0` disables, validated at startup); otherwise a different EXPERT must grant. The count is a policy input outside the atomic filter (documented limitation, not an atomic guarantee); basis recorded on the private event; existing grants are unaffected by threshold changes. With one EXPERT a self-resolved issue waits in `resolved`; no verification bypass. |
+| REM-L9 | **Public issue activity log:** per-issue, chronological, append-only, visible to all, from submission through `verified`; a derived read model over `statusHistory` + `remediationHistory` (no new storage) covering **successful** Issue-document mutations only, with per-event redaction (no grantee before acceptance, no responsibility-event notes, no `grantId`, no policy metadata such as self-grant). Equal-timestamp order is a presentation tie-break, not causal. V2 does not merge comments/Projects/future sources. Delivered with the detail read only. |
+| REM-L10 | Grant validity is independent of the grantor's or grantee's later role changes; remedies are EXPERT `withdraw` and ADMIN `revoke`. |

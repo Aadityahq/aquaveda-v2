@@ -1,3 +1,4 @@
+import type { IssueCategory, IssueSeverity } from "@/lib/issues/classification";
 import type { PublicActor } from "./actor";
 import type { PaginationQuery } from "./pagination";
 
@@ -25,8 +26,18 @@ export interface Issue {
   title: string;
   description: string;
   location: IssueLocation;
-  severity: string;
-  category: string;
+  /**
+   * Optional reporter-supplied place name (#134). UNTRUSTED display text:
+   * plain text only, not a verified address, never geometry. Absent on
+   * legacy and GPS/manual-coordinate reports.
+   */
+  locationLabel?: string;
+  /**
+   * Canonical value, or "" when unclassified (server domain/issue-classification.js).
+   * Assumes no pre-#67 free-text rows exist; see domain-model.md "Read-type assumption".
+   */
+  severity: IssueSeverity | "";
+  category: IssueCategory | "";
   domain: string;
   status: IssueStatus;
   reportedBy: PublicActor;
@@ -35,6 +46,30 @@ export interface Issue {
   updatedAt: string;
 }
 
+/**
+ * Query of GET /api/v1/issues. Discovery parameters are the locked #41
+ * contract (docs/architecture/issue-discovery-contract.md): all optional,
+ * combined with AND. `q` and `bbox` are sent as validated strings
+ * (`bbox` = "west,south,east,north").
+ */
 export interface IssueListQuery extends PaginationQuery {
   status?: IssueStatus;
+  category?: IssueCategory;
+  severity?: IssueSeverity;
+  q?: string;
+  bbox?: string;
+}
+
+/**
+ * Body of POST /api/v1/issues. `category`/`severity` are optional and, when
+ * present, must be canonical values (#67). The backend strips `domain`.
+ */
+export interface CreateIssuePayload {
+  title: string;
+  description: string;
+  location: IssueLocation;
+  /** Normalized by the contract in `lib/issues/location-contract`; omit when unset. */
+  locationLabel?: string;
+  category?: IssueCategory;
+  severity?: IssueSeverity;
 }

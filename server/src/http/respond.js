@@ -48,6 +48,12 @@ const ERROR_STATUS_MAP = Object.freeze({
   [DomainErrorCode.INVALID_CREDENTIALS]: 401,
   [DomainErrorCode.EMAIL_ALREADY_REGISTERED]: 409,
   [DomainErrorCode.REFRESH_FAILED]: 401,
+
+  // Rate-limiting (Issue #42): 429 Too Many Requests.
+  [DomainErrorCode.TOO_MANY_REQUESTS]: 429,
+
+  // Geocoding (Issue #134): provider unavailable/not configured.
+  [DomainErrorCode.GEOCODER_UNAVAILABLE]: 503,
 });
 
 /**

@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 
+import { LOCATION_LABEL_MAX_LENGTH } from "../domain/location-label.js";
+import {
+  ISSUE_CATEGORY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "../domain/issue-classification.js";
+
 const { Schema } = mongoose;
 
 /**
@@ -92,11 +98,12 @@ const issueStatusHistoryEntrySchema = new Schema(
  *   `updateOne`). The real guarantee is that no service operation ever
  *   exposes `reportedBy` as an updatable field. See persistence-design.md §6.
  *
- * `category` is deliberately a freeform String, not an enum — this
- * resolves decision-register D-9 ("implementation detail") at the point
- * this schema is written, since no approved document specifies a fixed
- * category list. `severity` is treated the same way for the same reason
- * (no approved severity scale exists in any locked document).
+ * `category` and `severity` are constrained to the canonical vocabulary
+ * in domain/issue-classification.js (Issue #67, decision-register D-9),
+ * plus "" meaning "not classified" (the default). The enum is
+ * defense-in-depth for create/save; reads never re-validate. No legacy
+ * free-text data is assumed to exist — see domain-model.md, "Read-type
+ * assumption".
  */
 const locationSchema = new Schema(
   {
@@ -148,12 +155,23 @@ const issueSchema = new Schema(
       type: locationSchema,
       required: true,
     },
+    // Optional, reporter-supplied, UNTRUSTED display text (#134;
+    // domain/location-label.js). Never geometry: `location` above is the
+    // only authoritative position. Absent on legacy/GPS/manual-coordinate
+    // issues; no default, no index, no migration.
+    locationLabel: {
+      type: String,
+      trim: true,
+      maxlength: LOCATION_LABEL_MAX_LENGTH,
+    },
     severity: {
       type: String,
+      enum: ["", ...ISSUE_SEVERITY_VALUES],
       default: "",
     },
     category: {
       type: String,
+      enum: ["", ...ISSUE_CATEGORY_VALUES],
       default: "",
     },
     domain: {
@@ -191,6 +209,14 @@ const issueSchema = new Schema(
 issueSchema.index({ location: "2dsphere" });
 issueSchema.index({ status: 1 });
 issueSchema.index({ reportedBy: 1 });
+// Issue #41: public text search (`q`) over title + description. Whole-word
+// matching with no stemming/stop-words (`default_language: "none"`) so
+// multilingual reports behave predictably. See
+// docs/architecture/issue-discovery-contract.md.
+issueSchema.index(
+  { title: "text", description: "text" },
+  { name: "issue_text_search", default_language: "none" },
+);
 
 export const Issue = mongoose.model("Issue", issueSchema);
 export default Issue;

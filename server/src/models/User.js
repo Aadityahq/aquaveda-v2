@@ -1,4 +1,10 @@
 import mongoose from "mongoose";
+import {
+  AFFILIATION_MAX_LENGTH,
+  EXPERIENCE_MAX_LENGTH,
+  EXPERTISE_VALUES,
+  REFERENCE_MAX_LENGTH,
+} from "../domain/expert-application-submission.js";
 
 const { Schema } = mongoose;
 
@@ -20,7 +26,8 @@ const { Schema } = mongoose;
  *
  * NOT enforced here (service-layer / Authentication milestone):
  * - how a password is hashed, verified, or rotated
- * - how a user is granted EXPERT or ADMIN (decision-register D-2, deferred)
+ * - how a user is granted ADMIN (#89). EXPERT is granted only through
+ *   an approved `expertApplication` (#91, expert-application.service.js)
  * - account suspension/deactivation (decision-register D-1, deferred —
  *   deliberately no `status`/`isActive` field exists on this schema)
  */
@@ -30,6 +37,85 @@ const BIO_MAX_LENGTH = 500; // No approved document specifies this number.
 // decision. Reasonable to keep for now (prevents unbounded free text),
 // but should not be treated as authoritative; revisit if any future
 // milestone needs a different bound.
+
+/**
+ * User.expertApplication (#91)
+ *
+ * Embedded on User (not a new collection) so that approval can flip
+ * `role` and `expertApplication.status` in ONE conditional atomic
+ * write — the two can never diverge and no transaction is needed
+ * (ADR-0005/0006). Absence of the subdocument = never applied.
+ *
+ * Lifecycle (enforced in expert-application.service.js, not here):
+ *   none -> pending, pending -> approved | rejected, rejected -> pending.
+ *   `approved` is terminal.
+ *
+ * `history` is append-only and holds EVERY transition including the
+ * initial `null -> pending`. Actor identity lives only in history
+ * entries — no flat reviewer/verifiedBy field (ADR-0005 §3).
+ */
+const EXPERT_APPLICATION_STATUSES = ["pending", "approved", "rejected"];
+const EXPERT_NOTE_MAX_LENGTH = 500;
+
+/**
+ * Application submission (EXP-L9+, design doc). Embedded on the `-> pending`
+ * history entry only, so each attempt keeps what was actually submitted.
+ * Deliberately NOT `required` anywhere: legacy entries have none, and the
+ * apply service (via validateSubmission) guarantees it for every new write.
+ * `acknowledgement.textSha256` is computed server-side from the retained
+ * immutable text for `version`; the client only ever supplies `version`.
+ */
+const expertSubmissionSchema = new Schema(
+  {
+    expertiseAreas: { type: [{ type: String, enum: EXPERTISE_VALUES }], default: [] },
+    experience: { type: String, maxlength: EXPERIENCE_MAX_LENGTH },
+    affiliation: { type: String, maxlength: AFFILIATION_MAX_LENGTH },
+    references: { type: [{ type: String, maxlength: REFERENCE_MAX_LENGTH }], default: [] },
+    acknowledgement: {
+      type: new Schema(
+        {
+          version: { type: Number, required: true },
+          textSha256: { type: String, required: true },
+          acceptedAt: { type: Date, required: true },
+        },
+        { _id: false },
+      ),
+    },
+  },
+  { _id: false },
+);
+
+const expertApplicationHistoryEntrySchema = new Schema(
+  {
+    fromStatus: {
+      type: String,
+      enum: [null, ...EXPERT_APPLICATION_STATUSES],
+      default: null,
+    },
+    toStatus: {
+      type: String,
+      enum: EXPERT_APPLICATION_STATUSES,
+      required: true,
+    },
+    actor: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    note: { type: String, trim: true, maxlength: EXPERT_NOTE_MAX_LENGTH },
+    submission: { type: expertSubmissionSchema, default: undefined },
+    timestamp: { type: Date, required: true, default: Date.now },
+  },
+  { _id: false },
+);
+
+const expertApplicationSchema = new Schema(
+  {
+    status: {
+      type: String,
+      enum: EXPERT_APPLICATION_STATUSES,
+      required: true,
+    },
+    history: { type: [expertApplicationHistoryEntrySchema], default: [] },
+  },
+  { _id: false },
+);
 
 const userSchema = new Schema(
   {
@@ -61,6 +147,10 @@ const userSchema = new Schema(
       maxlength: BIO_MAX_LENGTH,
       default: "",
     },
+    expertApplication: {
+      type: expertApplicationSchema,
+      default: undefined, // absent === never applied
+    },
   },
   {
     timestamps: true,
@@ -74,6 +164,12 @@ const userSchema = new Schema(
       },
     },
   },
+);
+
+// Reviewer queue (#91): partial index over pending applications only.
+userSchema.index(
+  { "expertApplication.status": 1, updatedAt: 1 },
+  { partialFilterExpression: { "expertApplication.status": "pending" } },
 );
 
 // Approved index: unique email (uniqueness comes from `unique: true` above;

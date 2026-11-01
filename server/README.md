@@ -27,8 +27,9 @@ specification, not as code to port.
   - Corrects v1 bugs: `password select:false` always present, consistent
     Zod validation on all routes (not just Issues/Comments), auth middleware
     does a DB lookup instead of trusting the JWT payload directly
-- `src/app.js` — Express app with Helmet, rate limiting, CORS for the
-  Next.js dev and production origins
+- `src/app.js` — Express app with a credentialed CORS allowlist and an
+  Origin/Referer guard for state-changing requests (per-route IP rate
+  limiting lives in the routers; Helmet is not used)
 
 ### Authentication and boundary implementation
 
@@ -40,47 +41,37 @@ specification, not as code to port.
 - Zod validation on register/login request bodies
 - `requireActor()` and existing operation-specific service authorization remain the backend contribution boundary
 
-The current domain HTTP surface contains nine state-changing routes and no
-Issue, Knowledge, Comment, or Project GET/list routes yet. Public domain
-exploration data therefore remains a future read-surface milestone.
+The domain HTTP surface (`src/routes/`) covers Issue, Knowledge, Comment,
+Project and Expert-application operations, including public read/list routes
+and the authenticated Knowledge workflow reads. The recommendation service
+(`src/services/recommendation.service.js`) has no HTTP route yet.
 
-### Explore milestone
+### Explore / Learn / Act / Community milestones
 
-- `src/modules/issues/` — full CRUD, geo queries, status lifecycle
-- `src/modules/ai/` — rule-based recommendation engine
-
-### Learn milestone
-
-- `src/modules/wiki/` — moderation lifecycle
-
-### Act milestone
-
-- `src/modules/projects/`
-
-### Community milestone
-
-- `src/modules/comments/` — Issue + Knowledge ref types
+Implemented in the existing layered layout (not a `src/modules/` tree):
+`src/services/{issue,knowledge,project,comment}.service.js`,
+`src/routes/*.routes.js`, `src/validation/*.validation.js`. The rule-based
+recommendation engine is `src/services/recommendation.service.js` (service
+only).
 
 ### Dashboard milestone
 
-- `src/modules/dashboard/`
+Not implemented.
 
 ## Environment variables
 
+The server runtime environment configuration is defined in `server/.env` (git-ignored; see `server/.env.example` for the full reference template).
+
 ```env
 PORT=5000
-MONGO_URI=mongodb://localhost:27017/aquaveda_v2
-TEST_MONGO_URI=mongodb://127.0.0.1:27017/aquaveda_v2_test   # required for `npm test`; must differ from MONGO_URI
-CLIENT_URL=http://localhost:3000
-ALLOWED_ORIGINS=http://localhost:3000
-JWT_ACCESS_SECRET=    # generate: openssl rand -base64 32
-JWT_REFRESH_SECRET=   # generate: openssl rand -base64 32
+NODE_ENV=development
+MONGO_URI=mongodb://127.0.0.1:27017/aquaveda_v2_dev
+TEST_MONGO_URI=mongodb://127.0.0.1:27017/aquaveda_v2_test   # optional: real MongoDB for `npm test`; if unset, in-memory MongoDB auto-starts
+ALLOWED_ORIGINS=http://localhost:3000                        # exact origins trusted for CORS and state-changing requests
+JWT_ACCESS_SECRET=    # required; generate: openssl rand -base64 32
+JWT_REFRESH_SECRET=   # required; distinct from JWT_ACCESS_SECRET; generate: openssl rand -base64 32
 JWT_ACCESS_EXPIRES=15m
 JWT_REFRESH_EXPIRES=7d
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX=200
-AUTH_RATE_LIMIT_WINDOW_MS=900000
-AUTH_RATE_LIMIT_MAX=20
 COOKIE_SAME_SITE=none  # locked: frontend/backend are different registrable
                         # domains (genuine cross-site). "none" is mandatory —
                         # "lax"/"strict" would silently drop auth cookies on
@@ -88,23 +79,106 @@ COOKIE_SAME_SITE=none  # locked: frontend/backend are different registrable
                         # NODE_ENV (browser requirement for SameSite=None).
 COOKIE_DOMAIN=          # leave unset. No cross-registrable-domain use case
                         # exists for the Domain attribute in this topology.
+
+# Rate-limit client identity (Issue #27) — REQUIRED in production
+TRUSTED_PROXY_HOPS=     # number of trusted reverse proxies in front of the API. 0 = directly
+                        # exposed (forwarded headers ignored). N = take the X-Forwarded-For entry the
+                        # Nth proxy appended. Production startup fails if unset. Wrong value =
+                        # limiter bypass (too high) or one shared bucket for all users (too low).
+
+# Place search (Issue #134) — all optional in development
+GEOCODER_BASE_URL=      # Nominatim-compatible https base URL. Unset: dev uses the public
+                        # OSMF instance (dev-only usage policy); PRODUCTION unset = place
+                        # search disabled (503, UI falls back to coordinates). Production
+                        # refuses the public OSMF host.
+GEOCODER_USER_AGENT=    # required in production when enabled; identifies the application
+GEOCODER_API_KEY=       # optional, server-side only; sent as `key=`
+GEOCODER_TIMEOUT_MS=4000
+GEOCODER_MIN_INTERVAL_MS=1100   # app-wide spacing between provider calls (>=1000 for public OSMF)
+GEOCODER_CACHE_TTL_MS=86400000
+GEOCODER_ATTRIBUTION_TEXT=      # default "© OpenStreetMap contributors"; set per provider terms
+GEOCODER_ATTRIBUTION_URL=       # default https://www.openstreetmap.org/copyright
 ```
 
-Env vars are loaded by `src/config/db.js` itself (via `dotenv/config`),
-not by `server.js`. Both the app entry point and the test suite import
-`db.js` (directly or via `tests/helpers/testDb.js`), so `.env` is loaded
-consistently regardless of entry point — no per-file `dotenv.config()`
-calls needed elsewhere.
+`ALLOWED_ORIGINS` is a comma-separated exact-origin allowlist. For
+state-changing requests (`POST`, `PUT`, `PATCH`, and `DELETE`), the CSRF
+provenance guard requires an allowed `Origin` or a `Referer` whose parsed
+origin is allowed. Requests with neither header are rejected; they are not
+treated as trusted server-to-server traffic. If `ALLOWED_ORIGINS` is empty,
+no browser provenance is trusted and every state-changing request is rejected
+until an explicit allowlist is configured. This fail-closed behavior does
+not disable CSRF protection.
 
-`connectDB()` defaults to `MONGO_URI`. The test helper explicitly passes
-`{ envVar: "TEST_MONGO_URI" }` and refuses to run if `TEST_MONGO_URI`
-equals `MONGO_URI`, so `npm test` can never silently operate against the
-development database.
+### Configuration hygiene & startup validation
+
+Environment variables are loaded and validated by `src/config/env.js`.
+`server.js` calls `validateStartupConfig()` at boot time, failing fast with
+descriptive errors before opening database connections or listening on ports:
+
+- **Missing configuration fails clearly:** `MONGO_URI`, `JWT_ACCESS_SECRET`,
+  and `JWT_REFRESH_SECRET` are required. Missing variables throw a startup
+  error naming the exact missing variable.
+- **Cryptographic key separation:** `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`
+  must never be identical strings. Reusing the same secret for both tokens is
+  blocked at startup and point-of-use to prevent token confusion attacks.
+- **Production security constraints (`NODE_ENV=production`):**
+  - Secrets must be at least 32 characters in length (256-bit entropy).
+  - Secrets must not contain predictable placeholder patterns (e.g. `test-`, `secret`, `changeme`).
+  - `ALLOWED_ORIGINS` must be explicitly configured and must never contain the wildcard `*`.
+- **Token lifetimes:** `JWT_ACCESS_EXPIRES` and `JWT_REFRESH_EXPIRES` must be
+  valid durations (e.g. `15m`, `7d`), and the access token lifetime must be
+  strictly shorter than the refresh token lifetime (`JWT_ACCESS_EXPIRES < JWT_REFRESH_EXPIRES`).
+- **Database separation guards:** `connectDB()` defaults to `MONGO_URI`. The test
+  helper explicitly passes `{ envVar: "TEST_MONGO_URI" }` and validates separation
+  via `assertTestDatabaseSeparation()` — refusing to run tests if `TEST_MONGO_URI`
+  matches `MONGO_URI` (including normalized loopback host/port/query variants) or
+  targets a database ending in `_dev`. If `TEST_MONGO_URI` is omitted, tests
+  transparently start an isolated in-process `mongodb-memory-server`.
+
+### Local ADMIN provisioning (development only)
+
+There is no other way to obtain an `ADMIN` (registration always creates a
+`USER`; `EXPERT` comes only from an ADMIN-approved Expert application).
+To exercise governance locally:
+
+```bash
+# server/.env (git-ignored) — never commit these values
+ALLOW_DEV_ADMIN_PROVISIONING=true
+MONGO_URI=mongodb://127.0.0.1:27017/aquaveda_v2_dev   # must be loopback AND end in _dev
+ADMIN_BOOTSTRAP_EMAIL=admin@example.test
+ADMIN_BOOTSTRAP_PASSWORD=<choose a local password, min 8 chars>
+ADMIN_BOOTSTRAP_NAME=Local Admin                      # optional
+
+npm run provision:admin
+```
+
+- **One database variable:** `MONGO_URI` is the only database setting this tool reads. The exact string it validates is the exact string it connects to (there is no second, separately configured URI).
+- **Safety (fails closed, checked before any DB connection):** refuses if
+  `NODE_ENV=production`, if `ALLOW_DEV_ADMIN_PROVISIONING` is not exactly
+  `true`, or if `MONGO_URI` is not a loopback host (`127.0.0.1`, `localhost`,
+  `::1`) with a database name ending `_dev`. There is no override. The
+  previously documented `aquaveda_v2` development database must be renamed
+  `aquaveda_v2_dev` to use this tool.
+- **Idempotent:** the first run creates the ADMIN; later runs change nothing
+  (a warning is printed if the stored password differs from the configured
+  one — it is never overwritten).
+- **No escalation:** if the email already belongs to a `USER` or `EXPERT`,
+  the tool refuses and modifies nothing. It provisions only the one
+  configured identity and has no HTTP surface.
+- **Secret-safe:** output never contains the password, its hash, or tokens.
+- **Use:** sign in through the normal `/auth/login` with those credentials.
+  ADMIN governs (e.g. approves/rejects Expert applications); it does **not**
+  review Knowledge — that stays EXPERT-only. To get an EXPERT locally,
+  register a user, `POST /api/v1/expert-application` with a valid submission
+  (see `tests/helpers/expert.js` `validSubmission()` for the shape), then approve
+  it as the ADMIN with the application's `revision`.
 
 Run backend tests from this directory with `npm test`. The suite uses the
-real MongoDB instance named by `TEST_MONGO_URI`; the database must be
-available before the command starts. The frontend has a separate root
-`npm test` command for its dependency-free session-state tests.
+MongoDB named by `TEST_MONGO_URI` when set (a dedicated database that must
+never be the same as `MONGO_URI`); when it is unset, locally, an in-memory
+MongoDB is started instead (see the environment block above). CI sets
+`TEST_MONGO_URI` to its `mongo:7` service and does not use the fallback. The frontend has a separate root `npm test`
+command (Vitest plus root Node tests).
 
 ## Known v1 bugs that do NOT carry forward
 
