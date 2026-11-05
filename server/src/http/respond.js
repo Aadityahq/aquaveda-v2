@@ -1,4 +1,5 @@
 import { DomainErrorCode } from "../services/errors.js";
+import { isClientSafeReason } from "./reasons.js";
 
 /**
  * Shared HTTP response/error-mapping utility.
@@ -30,6 +31,11 @@ import { DomainErrorCode } from "../services/errors.js";
  * The `code` field in the response body (always present on failure,
  * see sendError below) is what actually distinguishes the three 409
  * cases from each other — the status code alone is not expected to.
+ *
+ * ADR-0007 update: D-3a is resolved and AUTHORIZATION_POLICY_UNRESOLVED is
+ * no longer emitted by any service (a missing/unaccepted remediation grant is
+ * FORBIDDEN / INVALID_STATE). The enum value and this mapping are retained
+ * until a cleanup issue so historical references stay valid.
  */
 const ERROR_STATUS_MAP = Object.freeze({
   [DomainErrorCode.VALIDATION_FAILED]: 400,
@@ -84,12 +90,16 @@ export function sendError(res, err) {
   const status = ERROR_STATUS_MAP[err?.code];
 
   if (status !== undefined) {
-    res.status(status).json({
+    const body = {
       success: false,
       data: null,
       message: err.message,
       code: err.code,
-    });
+    };
+    // Optional, additive (#142): only an allowlisted reason; never `details`.
+    const reason = err.details?.reason;
+    if (isClientSafeReason(reason)) body.reason = reason;
+    res.status(status).json(body);
     return;
   }
 

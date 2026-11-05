@@ -9,6 +9,8 @@ import { issueRouter } from "../src/routes/issue.routes.js";
 import { User } from "../src/models/User.js";
 import { register } from "../src/services/auth.service.js";
 import { Issue } from "../src/models/Issue.js";
+import { changeStatus } from "../src/services/issue.service.js";
+import { acceptRemediation, grantRemediation, withdrawRemediation } from "../src/services/remediation.service.js";
 import { setupTestDb, teardownTestDb, clearCollections, fakeActor, validPoint } from "./helpers/testDb.js";
 
 /**
@@ -304,6 +306,10 @@ describe("POST /api/v1/issues", () => {
     assert.equal(res.json.success, true);
     assert.equal(res.json.data.title, "Leaking pipe");
     assert.equal(res.json.data.status, "open");
+    // #142 compatibility: the 201 keeps its pre-#142 shape (reportedBy is an id string; no __v).
+    assert.equal(typeof res.json.data.reportedBy, "string");
+    assert.ok(!("__v" in res.json.data));
+    assert.ok(!("actorProfile" in res.json.data.statusHistory[0]));
     assert.equal(typeof res.json.message, "string");
     assert.ok(res.json.message.length > 0);
     assert.equal(Object.keys(res.json).sort().join(","), "data,message,success");
@@ -383,122 +389,27 @@ describe("POST /api/v1/issues", () => {
   });
 });
 
-describe("PATCH /api/v1/issues/:issueId/status", () => {
-  async function makeOpenIssue(accessToken) {
-    const res = await request("POST", "/api/v1/issues", {
-      cookies: authCookie(accessToken),
-      body: {
-        title: "Leaking pipe",
-        description: "Water pooling near the market",
-        location: validPoint(),
-      },
-    });
-    return res.json.data;
-  }
-
-  it("200s on a valid EXPERT-authorized transition (open -> acknowledged)", async () => {
+describe("PATCH /api/v1/issues/:issueId/status (removed in #142)", () => {
+  it("is gone: 404, and a would-be legal transition mutates nothing", async () => {
     const reporter = await makeAuthedUser("USER");
     const expert = await makeAuthedUser("EXPERT");
-    const issue = await makeOpenIssue(reporter.accessToken);
-
-    const res = await request("PATCH", `/api/v1/issues/${issue._id}/status`, {
-      cookies: authCookie(expert.accessToken),
-      body: { targetStatus: "acknowledged" },
-    });
-
-    assert.equal(res.status, 200);
-    assert.equal(res.json.success, true);
-    assert.equal(res.json.data.status, "acknowledged");
-  });
-
-  it("400s with VALIDATION_FAILED for an unrecognized targetStatus", async () => {
-    const reporter = await makeAuthedUser("USER");
-    const issue = await makeOpenIssue(reporter.accessToken);
-
-    const res = await request("PATCH", `/api/v1/issues/${issue._id}/status`, {
+    const created = await request("POST", "/api/v1/issues", {
       cookies: authCookie(reporter.accessToken),
-      body: { targetStatus: "not_a_real_status" },
+      body: { title: "Leaking pipe", description: "Water pooling", location: validPoint() },
     });
+    const id = created.json.data._id;
 
-    assert.equal(res.status, 400);
-    assert.equal(res.json.code, "VALIDATION_FAILED");
-  });
-
-  it("403s with FORBIDDEN when a non-EXPERT attempts open -> acknowledged", async () => {
-    const reporter = await makeAuthedUser("USER");
-    const issue = await makeOpenIssue(reporter.accessToken);
-
-    const res = await request("PATCH", `/api/v1/issues/${issue._id}/status`, {
-      cookies: authCookie(reporter.accessToken),
-      body: { targetStatus: "acknowledged" },
-    });
-
-    assert.equal(res.status, 403);
-    assert.equal(res.json.code, "FORBIDDEN");
-  });
-
-  it("404s with NOT_FOUND for a well-formed but nonexistent issueId", async () => {
-    const expert = await makeAuthedUser("EXPERT");
-    const fakeId = "507f1f77bcf86cd799439011";
-
-    const res = await request("PATCH", `/api/v1/issues/${fakeId}/status`, {
+    const res = await request("PATCH", `/api/v1/issues/${id}/status`, {
       cookies: authCookie(expert.accessToken),
       body: { targetStatus: "acknowledged" },
     });
 
     assert.equal(res.status, 404);
-    assert.equal(res.json.code, "NOT_FOUND");
-  });
-
-  it("400s with VALIDATION_FAILED (CastError translation) for a malformed issueId", async () => {
-    const expert = await makeAuthedUser("EXPERT");
-
-    const res = await request("PATCH", "/api/v1/issues/not-a-valid-object-id/status", {
-      cookies: authCookie(expert.accessToken),
-      body: { targetStatus: "acknowledged" },
-    });
-
-    assert.equal(res.status, 400);
-    assert.equal(res.json.code, "VALIDATION_FAILED");
-  });
-
-  it("409s with AUTHORIZATION_POLICY_UNRESOLVED (never 403) for the D-3a-gated acknowledged -> in_progress transition", async () => {
-    const expert = await makeAuthedUser("EXPERT");
-    const issue = await makeOpenIssue(expert.accessToken);
-
-    // Move to acknowledged first (a legal, EXPERT-authorized transition).
-    await request("PATCH", `/api/v1/issues/${issue._id}/status`, {
-      cookies: authCookie(expert.accessToken),
-      body: { targetStatus: "acknowledged" },
-    });
-
-    const res = await request("PATCH", `/api/v1/issues/${issue._id}/status`, {
-      cookies: authCookie(expert.accessToken),
-      body: { targetStatus: "in_progress" },
-    });
-
-    assert.equal(res.status, 409);
-    assert.notEqual(res.status, 403);
-    assert.equal(res.json.code, "AUTHORIZATION_POLICY_UNRESOLVED");
-    assert.equal(res.json.success, false);
-    assert.equal(res.json.data, null);
-  });
-
-  it("409s with STATE_RACE style envelope on a genuinely illegal transition (open -> verified)", async () => {
-    const expert = await makeAuthedUser("EXPERT");
-    const issue = await makeOpenIssue(expert.accessToken);
-
-    const res = await request("PATCH", `/api/v1/issues/${issue._id}/status`, {
-      cookies: authCookie(expert.accessToken),
-      body: { targetStatus: "verified" },
-    });
-
-    assert.equal(res.status, 409);
-    assert.equal(res.json.code, "INVALID_STATE");
+    const stored = await Issue.findById(id);
+    assert.equal(stored.status, "open");
+    assert.equal(stored.statusHistory.length, 1);
   });
 });
-
-
 
 describe("GET /api/v1/issues/:issueId (Issue #48 — public read, no auth required)", () => {
   it("200s for an anonymous request", async () => {
@@ -573,5 +484,114 @@ describe("POST /api/v1/issues — locationLabel (#134, backward compatible)", ()
     assert.equal(res.status, 200);
     assert.equal(res.json.data.items.length, 1);
     assert.equal(res.json.data.items[0].locationLabel, undefined);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR-0007 / #140 finding M1: private remediation state must never cross the
+// HTTP boundary. Routes serialize raw documents, so this is asserted on the
+// real serialized responses (list, detail, PATCH), not on the transform function.
+// ---------------------------------------------------------------------------
+describe("private remediation state never leaks over HTTP (#140 M1)", () => {
+  const PRIVATE_GRANT = "PRIVATE-grant-reason-zq91";
+  const PRIVATE_WITHDRAW = "PRIVATE-withdraw-reason-zq92";
+
+  async function scenario() {
+    const expert = await makeAuthedUser("EXPERT");
+    const expert2 = await makeAuthedUser("EXPERT");
+    const grantee = await makeAuthedUser("USER");
+    const reporter = await makeAuthedUser("USER");
+    const created = await request("POST", "/api/v1/issues", {
+      cookies: authCookie(reporter.accessToken),
+      body: { title: "Leak", description: "Burst pipe", location: { type: "Point", coordinates: [85.1, 25.6] } },
+    });
+    assert.equal(created.status, 201);
+    const id = created.json.data._id;
+    const ex = { id: expert.user.id, role: "EXPERT" };
+    const ex2 = { id: expert2.user.id, role: "EXPERT" };
+    const gr = { id: grantee.user.id, role: "USER" };
+    await changeStatus(ex, id, "acknowledged", { note: "PUBLIC-ack-note" });
+    await grantRemediation(ex, id, gr.id, { note: PRIVATE_GRANT });
+    await withdrawRemediation(ex2, id, { note: PRIVATE_WITHDRAW });
+    await grantRemediation(ex, id, gr.id);
+    return { id, ex, ex2, gr, grantee, expert, reporter };
+  }
+
+  const FORBIDDEN_KEYS = ["remediation", "remediationHistory", "grantId", "grantedBy", "acceptedAt"];
+
+  function assertNoPrivateState(res, extraSecrets = [], allowKeys = []) {
+    const text = JSON.stringify(res.json);
+    for (const key of FORBIDDEN_KEYS.filter((k) => !allowKeys.includes(k))) assert.ok(!text.includes(`"${key}"`), `response must not contain "${key}"`);
+    for (const secret of [PRIVATE_GRANT, PRIVATE_WITHDRAW, ...extraSecrets]) {
+      assert.ok(!text.includes(secret), `response must not contain ${secret}`);
+    }
+  }
+
+  it("GET /issues (list) and GET /issues/:id (detail), anonymous: no private state, public status note present", async () => {
+    const { id, gr } = await scenario();
+    const list = await request("GET", "/api/v1/issues");
+    assert.equal(list.status, 200);
+    assertNoPrivateState(list, [gr.id]); // a PENDING grantee's identity is private
+    assert.ok(JSON.stringify(list.json).includes("PUBLIC-ack-note"));
+
+    const detail = await request("GET", `/api/v1/issues/${id}`);
+    assert.equal(detail.status, 200);
+    assertNoPrivateState(detail, [gr.id]);
+    const note = detail.json.data.statusHistory.find((h) => h.toStatus === "acknowledged").note;
+    assert.equal(note, "PUBLIC-ack-note", "statusHistory[].note stays public");
+  });
+
+  it("an authenticated EXPERT also receives no private state from the public reads", async () => {
+    const { id, expert } = await scenario();
+    const detail = await request("GET", `/api/v1/issues/${id}`, { cookies: authCookie(expert.accessToken) });
+    assertNoPrivateState(detail);
+  });
+
+  it("POST /issues/:id/start response (accepted grantee) carries no private state; the accepted assignee is public", async () => {
+    const { id, gr, grantee } = await scenario();
+    await acceptRemediation(gr, id);
+    const res = await request("POST", `/api/v1/issues/${id}/start`, {
+      cookies: authCookie(grantee.accessToken),
+      body: {},
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.json));
+    assert.equal(res.json.data.issue.status, "in_progress");
+    // `acceptedAt` is public on `assignee` once accepted (ADR-0007 section 7).
+    // The grantee is a PARTICIPANT of the `granted` event, so their own workflow
+    // view may include that event's note; the withdraw note (role-based only) may not.
+    const text = JSON.stringify(res.json);
+    for (const key of FORBIDDEN_KEYS.filter((k) => k !== "acceptedAt")) {
+      assert.ok(!text.includes(`"${key}"`), `response must not contain "${key}"`);
+    }
+    assert.ok(!text.includes(PRIVATE_WITHDRAW), "withdraw note is never visible through participation");
+    assert.ok(text.includes(PRIVATE_GRANT), "a participant sees the notes of their own events");
+    assert.equal(res.json.data.issue.assignee.actor._id, String(gr.id));
+    // internal reads still see the grant
+    assert.ok((await Issue.findById(id)).remediation);
+  });
+
+  it("POST /issues/:id/start by a non-grantee EXPERT is 403 FORBIDDEN and leaks nothing about the pending grant", async () => {
+    const { id, expert } = await scenario();
+    const res = await request("POST", `/api/v1/issues/${id}/start`, {
+      cookies: authCookie(expert.accessToken),
+      body: {},
+    });
+    assert.equal(res.status, 403);
+    assert.equal(res.json.code, "FORBIDDEN");
+    assertNoPrivateState(res);
+  });
+
+  it("a legacy issue (stored without the new fields) is served unchanged", async () => {
+    const reporter = await makeAuthedUser("USER");
+    const inserted = await Issue.collection.insertOne({
+      title: "Legacy", description: "Pre-ADR-0007", location: { type: "Point", coordinates: [77.5, 12.9] },
+      reportedBy: (await User.findOne({ _id: reporter.user.id }))._id, status: "open",
+      statusHistory: [{ fromStatus: null, toStatus: "open", actor: (await User.findOne({ _id: reporter.user.id }))._id, timestamp: new Date() }],
+      createdAt: new Date(), updatedAt: new Date(),
+    });
+    const res = await request("GET", `/api/v1/issues/${inserted.insertedId}`);
+    assert.equal(res.status, 200);
+    assert.equal(res.json.data.title, "Legacy");
+    assertNoPrivateState(res);
   });
 });
