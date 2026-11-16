@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import IssuePage from "@/app/explore/[issueId]/page";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ApiError } from "@/lib/api/client";
-import type { Issue } from "@/lib/api/types/issue";
+import { makeIssueDetail } from "@/test-utils/issue-detail";
 
 /**
  * The Issue detail's discussion against the real auth boundary (same
@@ -20,6 +20,8 @@ const mockRefreshSession = vi.fn();
 const mockCreateComment = vi.fn();
 const mockRefresh = vi.fn();
 
+// Client island (own tests: issue-action-bar.test.tsx); inert here so IssueDetail stays a pure render.
+vi.mock("@/components/issues/issue-action-bar", () => ({ IssueActionBar: () => null }));
 vi.mock("@/lib/api/issues", () => ({ getIssue: (id: string) => mockGetIssue(id) }));
 vi.mock("@/lib/api/auth", () => ({
   getCurrentUser: () => mockGetCurrentUser(),
@@ -37,21 +39,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/components/comments/comment-thread", () => ({ CommentThread: () => <p>Existing comment</p> }));
 vi.mock("@/components/issues/issue-map-loader", () => ({ IssueMapLoader: () => null }));
+vi.mock("@/components/issues/issue-recommendations", () => ({ IssueRecommendations: () => null }));
 
-const ISSUE: Issue = {
-  _id: "i1",
-  title: "Burst pipe",
-  description: "Water everywhere",
-  location: { type: "Point", coordinates: [77.5, 12.9] },
-  severity: "",
-  category: "",
-  domain: "water",
-  status: "open",
-  reportedBy: { _id: "u1", name: "Asha", role: "USER" },
-  statusHistory: [],
-  createdAt: "2026-03-05T10:00:00.000Z",
-  updatedAt: "2026-03-05T10:00:00.000Z",
-};
+const ISSUE = makeIssueDetail({ title: "Burst pipe", description: "Water everywhere", severity: "", category: "", status: "open", statusHistory: [], activity: [] });
 
 async function renderIssue() {
   render(<AuthProvider>{await IssuePage({ params: Promise.resolve({ issueId: "i1" }) })}</AuthProvider>);

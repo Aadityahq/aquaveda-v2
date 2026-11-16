@@ -82,8 +82,8 @@ or hrefs built at runtime that never render in a test. External, `#frag`,
 `?query` and relative hrefs are never resolved. It is an approximation of
 Next.js routing on purpose; the real router is covered by e2e (#85).
 
-**Deferred links:** links to not-yet-built routes (currently `/community`,
-`/dashboard` in the nav) must be listed in the test's `deferred` array. The
+**Deferred links:** links to not-yet-built routes (currently only `/community`
+in the nav; `/dashboard` gained its page in #54) must be listed in the test's `deferred` array. The
 check fails if a deferred route gains a page, so the list cannot go stale.
 
 **Adding coverage:** render the component, then
@@ -206,7 +206,7 @@ available (`E2E_MONGO_URI`, default `mongodb://127.0.0.1:27017/aquaveda_v2_e2e`)
 installed (`npx playwright install chromium`): `npm run test:e2e` (Playwright builds and serves the app itself).
 
 - **Processes:** `playwright.config.ts` starts the Express backend and `next start`
-  (production build; `NEXT_PUBLIC_API_URL` is set for the build too, since Next inlines it at build time), blocking on `/api/v1/health` and the web origin. No mocks; real auth and DB.
+  (production build; `NEXT_PUBLIC_API_URL` is set for the build too, since Next inlines it at build time), blocking on `/api/v1/ready` (database readiness, #127; `/api/v1/health` is liveness only and does not reflect MongoDB) and the web origin. No mocks; real auth and DB.
 - **Data:** `globalSetup` runs `server/scripts/seed-e2e.js`, which wipes every collection and
   therefore refuses to run unless `MONGO_URI` is a loopback host (`127.0.0.1`, `localhost`, `::1`)
   AND a database ending in `_e2e`, checked before connecting (`server/scripts/e2e-seed-guard.js`,
@@ -230,6 +230,6 @@ installed (`npx playwright install chromium`): `npm run test:e2e` (Playwright bu
   list -> ADMIN gets 403 on `GET /knowledge/review-queue` and the review page shows the denial
   (ADMIN != EXPERT) -> applicant's session now resolves `EXPERT` (role is read from the DB per request)
   -> EXPERT approves the pending article -> it appears as a link on public `/learn`.
-- **Out of scope:** Community/Dashboard (deferred routes), rich-text, visual regression. Knowledge
+- **Out of scope:** Community (deferred route), rich-text, visual regression. Knowledge
   moderation is covered only through the governance flow above; reject paths and re-application are not.
 - Vitest excludes `e2e/`; Playwright owns `*.spec.ts`.

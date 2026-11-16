@@ -11,7 +11,9 @@ import {
 } from "../services/remediation.service.js";
 import { toCreatedIssueDTO } from "../services/issue.dto.js";
 import { sendSuccess, sendError, sendValidationError } from "../http/respond.js";
-import { createIssueSchema, listIssuesQuerySchema } from "../validation/issue.validation.js";
+import { attentionQueueQuerySchema, createIssueSchema, listIssuesQuerySchema } from "../validation/issue.validation.js";
+import { listAttentionQueue } from "../services/issue-attention.service.js";
+import { getRecommendationsForIssue } from "../services/recommendation.service.js";
 import { grantRemediationSchema, noteBodySchema } from "../validation/remediation.validation.js";
 
 /**
@@ -24,11 +26,14 @@ import { grantRemediationSchema, noteBodySchema } from "../validation/remediatio
  * route checks a role or a grant. Every Issue payload leaves through an
  * explicit-allowlist mapper (issue.dto.js) — never a raw document.
  *
- * Public reads (GET /, GET /:issueId) require no actor. GET /:issueId/workflow
- * and every POST need an actor; the services enforce it (requireActor).
+ * Public reads (GET /, GET /:issueId, GET /:issueId/recommendations) require
+ * no actor. GET /:issueId/workflow and every POST need an actor; the services
+ * enforce it (requireActor).
  *
  * Registration order: GET /:issueId/workflow is a distinct two-segment path, so
- * it cannot shadow or be shadowed by GET /:issueId (route-order test).
+ * it cannot shadow or be shadowed by GET /:issueId; GET /attention (EXPERT
+ * needs-attention queues, #148) is registered before GET /:issueId so the
+ * literal is never parsed as an Issue id (route-order test).
  *
  * `PATCH /:issueId/status` was REMOVED in #142: the explicit transition routes
  * below name their exact source edge (`expectedFrom`) and can carry a note.
@@ -45,6 +50,35 @@ issueRouter.get("/", async (req, res) => {
 
   try {
     sendSuccess(res, await listPublicIssues(parsed.data), "Issues retrieved");
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Registered BEFORE `GET /:issueId` so "attention" is never read as an Issue id.
+issueRouter.get("/attention", async (req, res) => {
+  const parsed = attentionQueueQuerySchema.safeParse(req.query ?? {});
+  if (!parsed.success) {
+    sendValidationError(res, parsed.error);
+    return;
+  }
+
+  try {
+    const page = await listAttentionQueue(req.actorContext, parsed.data);
+    res.set("Cache-Control", "private, no-store");
+    sendSuccess(res, page, "Attention queue retrieved");
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+issueRouter.get("/:issueId/recommendations", async (req, res) => {
+  try {
+    sendSuccess(
+      res,
+      await getRecommendationsForIssue(req.params.issueId),
+      "Recommendations retrieved",
+    );
   } catch (err) {
     sendError(res, err);
   }

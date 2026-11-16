@@ -12,10 +12,15 @@ contract (decision register, "Locked — Routes" and the RT-142 entries), not by
 the presence of the global auth middleware. For Issues:
 `GET /api/v1/issues` and `GET /api/v1/issues/:issueId` are anonymous reads,
 while `GET /api/v1/issues/:issueId/workflow` requires an actor and returns a
-view built for that actor only.
+view built for that actor only. `GET /api/v1/issues/attention` (needs-attention queues) requires the EXPERT role.
+`GET /api/v1/dashboard` requires an actor and
+returns the caller's own aggregates plus public aggregates
+(`docs/architecture/dashboard-contract.md`).
 
-Auth probes: `GET /api/v1/health` and `GET /api/v1/auth/me` (`200` with
-`{ user: null }` for an anonymous request).
+Public probes: `GET /api/v1/health` (liveness) and `GET /api/v1/ready`
+(database readiness), both described in
+`docs/architecture/health-and-readiness.md`, plus `GET /api/v1/auth/me` (`200`
+with `{ user: null }` for an anonymous request).
 
 ## Contribution behavior
 
